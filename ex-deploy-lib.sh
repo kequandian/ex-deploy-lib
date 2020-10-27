@@ -1,15 +1,15 @@
 #!/bin/sh
 
 ## export 
-export STANDALONE_CONTAINER='cinema-api'
+# export DOCKER_CONTAINER='api'
 ####
 
 
 ## main
-container=${STANDALONE_CONTAINER}
+container=${DOCKER_CONTAINER}
 
 if [ ! $container ];then
-   echo 'Usage: ex-deploy-lib.sh <container-name>'
+   echo 'Usage: export DOCKER_CONTAINER='api' && sh ex-deploy-lib.sh'
    exit
 fi
 
