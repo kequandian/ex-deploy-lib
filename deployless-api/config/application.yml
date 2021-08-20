@@ -1,0 +1,28 @@
+---
+spring:
+  profiles: standalone
+  datasource:
+    url: jdbc:mysql://192.168.3.239:3306/test?characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+    username: root
+    password: root
+    filters: log4j,mergeStat
+    sql-script-encoding: UTF-8
+    schema: classpath*:sql/*-schema.sql
+    data: classpath*:sql/*-data.sql
+    initialize: true
+    
+logging:
+  level: debug
+---
+spring:
+  profiles: test
+  datasource:
+    url: jdbc:h2:mem:test;MODE=MYSQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false;
+    driver-class-name: org.h2.Driver
+    username: sa
+    filters: log4j,wall,mergeStat
+    sql-script-encoding: UTF-8
+    initialize: true
+
+logging:
+  level: debug  
