@@ -1,0 +1,18 @@
+/*
+ Navicat Premium Data Transfer
+
+ Source Server Type    : MySQL
+ Source Server Version : 50722
+ Source Host           : localhost:3306
+ Source Schema         : test
+
+ Target Server Type    : MySQL
+ Target Server Version : 50722
+ File Encoding         : 65001
+
+ Date: 06/08/2020 09:45:34
+*/
+-- ----------------------------
+-- Records of t_jar
+-- ----------------------------
+INSERT INTO `t_jar` VALUES (1, 'UjQhM2mOOR7I', 'standalone.jar', 'stat', '{\"dependencies\": [\"spring-boot-starter-amqp-1.5.6.RELEASE.jar\", \"spring-boot-starter-1.5.6.RELEASE.jar\", \"spring-boot-1.5.6.RELEASE.jar\", \"spring-boot-autoconfigure-1.5.6.RELEASE.jar\", \"spring-boot-starter-logging-1.5.6.RELEASE.jar\", \"logback-classic-1.1.11.jar\", \"logback-core-1.1.11.jar\", \"jcl-over-slf4j-1.7.25.jar\", \"jul-to-slf4j-1.7.25.jar\", \"log4j-over-slf4j-1.7.25.jar\", \"snakeyaml-1.17.jar\", \"spring-messaging-4.3.10.RELEASE.jar\", \"spring-beans-4.3.10.RELEASE.jar\", \"spring-context-4.3.10.RELEASE.jar\", \"spring-expression-4.3.10.RELEASE.jar\", \"spring-rabbit-1.7.3.RELEASE.jar\", \"spring-web-4.3.10.RELEASE.jar\", \"http-client-1.1.1.RELEASE.jar\", \"httpclient-4.5.3.jar\", \"httpcore-4.4.6.jar\", \"commons-codec-1.10.jar\", \"amqp-client-4.0.2.jar\", \"spring-retry-1.2.1.RELEASE.jar\", \"spring-amqp-1.7.3.RELEASE.jar\", \"spring-tx-4.3.10.RELEASE.jar\", \"mysql-connector-java-8.0.20.jar\", \"protobuf-java-3.6.1.jar\", \"crud-dev-0.0.1.jar\", \"swagger-ui-0.0.1.jar\", \"fastjson-1.2.52.jar\", \"druid-1.1.12.jar\", \"commons-io-2.5.jar\", \"spring-boot-starter-web-1.5.6.RELEASE.jar\", \"hibernate-validator-5.3.5.Final.jar\", \"validation-api-1.1.0.Final.jar\", \"jboss-logging-3.3.1.Final.jar\", \"jackson-databind-2.8.9.jar\", \"jackson-annotations-2.8.0.jar\", \"jackson-core-2.8.9.jar\", \"spring-webmvc-4.3.10.RELEASE.jar\", \"crud-plus-0.0.6.jar\", \"crud-base-0.0.1.jar\", \"mybatis-plus-2.1.9.jar\", \"mybatis-plus-support-2.1.9.jar\", \"mybatis-spring-1.3.1.jar\", \"mybatis-3.4.5.jar\", \"spring-jdbc-4.3.10.RELEASE.jar\", \"mybatis-plus-core-2.1.9.jar\", \"jsqlparser-1.1.jar\", \"mybatis-plus-generate-2.1.9.jar\", \"mybatisplus-spring-boot-starter-1.0.5.jar\", \"spring-boot-configuration-processor-1.5.6.RELEASE.jar\", \"spring-boot-starter-jdbc-1.5.6.RELEASE.jar\", \"tomcat-jdbc-8.5.16.jar\", \"tomcat-juli-8.5.16.jar\", \"crud-core-0.0.2.jar\", \"springfox-swagger2-2.5.0.jar\", \"swagger-annotations-1.5.9.jar\", \"swagger-models-1.5.9.jar\", \"springfox-spi-2.5.0.jar\", \"springfox-core-2.5.0.jar\", \"springfox-schema-2.5.0.jar\", \"springfox-swagger-common-2.5.0.jar\", \"springfox-spring-web-2.5.0.jar\", \"guava-18.0.jar\", \"classmate-1.3.3.jar\", \"spring-plugin-core-1.2.0.RELEASE.jar\", \"spring-plugin-metadata-1.2.0.RELEASE.jar\", \"mapstruct-1.0.0.Final.jar\", \"springfox-swagger-ui-2.5.0.jar\", \"spring-boot-starter-aop-1.5.6.RELEASE.jar\", \"spring-aop-4.3.10.RELEASE.jar\", \"spring-boot-starter-undertow-1.5.6.RELEASE.jar\", \"undertow-core-1.4.18.Final.jar\", \"xnio-api-3.3.8.Final.jar\", \"xnio-nio-3.3.8.Final.jar\", \"undertow-servlet-1.4.18.Final.jar\", \"jboss-annotations-api_1.2_spec-1.0.0.Final.jar\", \"undertow-websockets-jsr-1.4.18.Final.jar\", \"jboss-websocket-api_1.1_spec-1.1.0.Final.jar\", \"javax.servlet-api-3.1.0.jar\", \"javax.el-3.0.0.jar\", \"ehcache-core-2.6.11.jar\", \"ehcache-3.3.1.jar\", \"android-json-0.0.20131108.vaadin1.jar\", \"spring-core-4.3.10.RELEASE.jar\", \"commons-lang3-3.9.jar\", \"log4j-1.2.17.jar\", \"slf4j-api-1.7.29.jar\", \"jaxb-api-2.3.1.jar\", \"javax.activation-api-1.2.0.jar\", \"jaxb-core-2.3.0.jar\", \"jaxb-impl-2.3.1.jar\", \"activation-1.1.1.jar\", \"aspectjweaver-1.9.4.jar\", \"test-inject.jar\"]}', '2020-08-04 16:50:04', '2020-08-06 09:43:10');

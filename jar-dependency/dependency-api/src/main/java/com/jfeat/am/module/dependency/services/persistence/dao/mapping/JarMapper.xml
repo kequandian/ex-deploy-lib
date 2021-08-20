@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.jfeat.am.module.dependency.services.persistence.dao.JarMapper">
+
+    <!-- 开启二级缓存 -->
+    <cache type="org.mybatis.caches.ehcache.LoggingEhcache"/>
+
+    <!-- 通用查询映射结果 -->
+    <resultMap id="BaseResultMap" type="com.jfeat.am.module.dependency.services.persistence.model.Jar">
+        <id column="id" property="id" />
+        <id column="app_id" property="appId" />
+        <result column="name" property="name" />
+        <result column="status" property="status" />
+        <result column="dependencies" property="dependencies" />
+    </resultMap>
+
+    <!-- 通用查询结果列 -->
+    <sql id="Base_Column_List">
+        id, app_id, name, status, dependencies
+    </sql>
+
+</mapper>
