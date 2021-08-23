@@ -1,0 +1,41 @@
+@endpoint=http://localhost:8080
+
+### 查询所有libs
+GET {{endpoint}}/api/jar/deploy/libs
+Content-Type: application/json
+
+
+### 发送lib
+POST {{endpoint}}/api/jar/deploy/lib/send
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
+
+------WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: form-data; name="text"
+
+title
+------WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: form-data; name="file"; filename="crud-core-0.0.5.jar"
+
+< ./crud-core-0.0.5.jar
+------WebKitFormBoundaryAFRaG58f2nIb0mPB--
+
+
+### 查询lib依赖
+GET {{endpoint}}/api/jar/deploy/dependencies?lib=crud-core-0.0.5.jar
+Content-Type: application/json
+
+### 查询APP依赖
+GET {{endpoint}}/api/jar/deploy/dependencies/app
+Content-Type: application/json
+
+
+### 检查lib是否可装配
+GET {{endpoint}}/api/jar/deploy/lib/sanity?lib=crud-core-0.0.5.jar
+Content-Type: application/json
+
+
+
+### 注入 (TBD)
+POST {{endpoint}}/api/jar/dependencies/inject
+Content-Type: application/json
+

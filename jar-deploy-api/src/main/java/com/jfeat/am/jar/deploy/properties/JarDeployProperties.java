@@ -1,4 +1,4 @@
-package com.jfeat.am.module.dependency.properties;
+package com.jfeat.am.jar.deploy.properties;
 
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
@@ -21,8 +21,8 @@ import java.io.IOException;
 @Data
 @Component
 @Accessors(chain = true)
-@ConfigurationProperties(prefix = "deployless")
-public class DeploylessProperties {
+@ConfigurationProperties(prefix = "jar")
+public class JarDeployProperties {
     /**
      * 应用路径
      */
@@ -33,19 +33,15 @@ public class DeploylessProperties {
         File[] listFiles = file.listFiles(new FileFilter() {
             @Override
             public boolean accept(File file) {
-                try {
-                    String path = file.getCanonicalPath();
-                    return FilenameUtils.getExtension(path).equals("jar") &&
-                            (FilenameUtils.getBaseName(path).equals("app") || FilenameUtils.getBaseName(path).endsWith("standalone"));
-                }catch (IOException e){
-                    return false;
-                }
+                String fileName = file.getName();
+                return fileName.endsWith("app.jar") ||
+                       fileName.endsWith ("-standalone.jar");
             }
         });
-        if (listFiles!=null && listFiles.length>1)
+        if (listFiles!=null && listFiles.length>0)
             return listFiles[0];
 
-        throw new BusinessException(BusinessCode.FileReadingError);
+        return null;
     }
 
     /**

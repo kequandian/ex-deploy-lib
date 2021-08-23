@@ -1,16 +1,11 @@
 package com.jfeat;
 
-import com.jfeat.crud.core.properties.AmProperties;
-
 import org.springframework.boot.SpringApplication;
-
 import springfox.documentation.swagger2.annotations.EnableSwagger2;
 
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurerAdapter;
-
-import javax.annotation.Resource;
 
 /**
  * SpringBoot Application
@@ -19,8 +14,6 @@ import javax.annotation.Resource;
 @SpringBootApplication
 @EnableSwagger2
 public class AmApplication extends WebMvcConfigurerAdapter {
-    @Resource
-    private AmProperties amProperties;
 
     /**
      * 增加swagger的支持
