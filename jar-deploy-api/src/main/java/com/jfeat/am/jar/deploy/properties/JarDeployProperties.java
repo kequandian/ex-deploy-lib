@@ -21,38 +21,28 @@ import java.io.IOException;
 @Data
 @Component
 @Accessors(chain = true)
-@ConfigurationProperties(prefix = "jar")
+@ConfigurationProperties(prefix = "jar-deploy")
 public class JarDeployProperties {
     /**
      * 应用路径
      */
-    String appsPath;
+    String rootPath;
 
-    public File getStandaloneFile(){
-        File file = new File(appsPath);
-        File[] listFiles = file.listFiles(new FileFilter() {
-            @Override
-            public boolean accept(File file) {
-                String fileName = file.getName();
-                return fileName.endsWith("app.jar") ||
-                       fileName.endsWith ("-standalone.jar");
-            }
-        });
-        if (listFiles!=null && listFiles.length>0)
-            return listFiles[0];
+    // public File getStandaloneFile(){
+    //     File file = new File(appsPath);
+    //     File[] listFiles = file.listFiles(new FileFilter() {
+    //         @Override
+    //         public boolean accept(File file) {
+    //             String fileName = file.getName();
+    //             return fileName.endsWith("app.jar") ||
+    //                    fileName.endsWith ("-standalone.jar");
+    //         }
+    //     });
+    //     if (listFiles!=null && listFiles.length>0)
+    //         return listFiles[0];
 
-        return null;
-    }
-
-    /**
-     * 库目录
-     */
-    String libPath;
-
-    /**
-     * 代码路径
-     */
-    String codePath;
+    //     return null;
+    // }
 
 
     /**

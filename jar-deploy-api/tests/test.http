@@ -1,37 +1,64 @@
 @endpoint=http://localhost:8080
 
-### 查询所有libs
-GET {{endpoint}}/api/jar/deploy/libs
+### 查询根目录下的JAR
+GET {{endpoint}}/api/jar/deploy/jars
 Content-Type: application/json
 
 
-### 发送lib
-POST {{endpoint}}/api/jar/deploy/lib/send
+### 查询指定目录下的JAR
+GET {{endpoint}}/api/jar/deploy/jars/lib
+Content-Type: application/json
+
+
+### 发送jar文件至lib目录
+POST {{endpoint}}/api/jar/deploy/jars/upload/lib
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
 
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB
-Content-Disposition: form-data; name="text"
+Content-Disposition: form-data; name="file"
 
 title
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB
-Content-Disposition: form-data; name="file"; filename="crud-core-0.0.5.jar"
+Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar"
 
-< ./crud-core-0.0.5.jar
+< ./target/jar-deploy-api-1.0.0.jar
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB--
 
 
-### 查询lib依赖
-GET {{endpoint}}/api/jar/deploy/dependencies?lib=crud-core-0.0.5.jar
+### 查询jar依赖
+GET {{endpoint}}/api/jar/deploy/dependencies?jar=jar-deploy-api-1.0.0-standalone.jar
 Content-Type: application/json
 
-### 查询APP依赖
-GET {{endpoint}}/api/jar/deploy/dependencies/app
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/deploy/dependencies/lib?jar=jar-deploy-api-1.0.0.jar
 Content-Type: application/json
 
 
-### 检查lib是否可装配
-GET {{endpoint}}/api/jar/deploy/lib/sanity?lib=crud-core-0.0.5.jar
+###
+### 查询jar依赖+checksum
+###
+
+GET {{endpoint}}/api/jar/deploy/checksum?jar=jar-deploy-api-1.0.0-standalone.jar
 Content-Type: application/json
+
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/deploy/checksum/lib?jar=jar-deploy-api-1.0.0.jar
+Content-Type: application/json
+
+
+### 检查lib是否可装配(返回不匹配项）
+GET {{endpoint}}/api/jar/deploy/mismatch
+?baseJar=jar-deploy-api-1.0.0-standalone.jar
+&jar=jar-deploy-api-1.0.0.jar
+Content-Type: application/json
+
+
+### 检查lib是否可装配（返回匹配项)
+GET {{endpoint}}/api/jar/deploy/match
+?baseJar=jar-deploy-api-1.0.0-standalone.jar
+&jar=jar-deploy-api-1.0.0.jar
+Content-Type: application/json
+
 
 
 

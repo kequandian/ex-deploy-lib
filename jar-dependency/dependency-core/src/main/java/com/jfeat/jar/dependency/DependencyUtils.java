@@ -1,5 +1,6 @@
 package com.jfeat.jar.dependency;
 
+import com.jfeat.jar.dependency.model.ChecksumModel;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
@@ -14,6 +15,7 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -42,7 +44,7 @@ public class DependencyUtils {
      * @return boolean
      */
     public static boolean isLegal(String dependencyJarName) {
-        System.out.println(dependencyJarName);
+        //System.out.println(dependencyJarName);
         return StringUtils.isNotBlank(dependencyJarName) && dependencyJarName.matches(DEPENDENCY_JAR_NAME_REGEX);
     }
 
@@ -102,6 +104,37 @@ public class DependencyUtils {
     }
 
     /**
+     * 通过jar包文件解压，获取其依赖包(lib)并生成依赖集合
+     *
+     * @param jarFile 目标JAR包
+     * @return java.util.List<java.lang.String>
+     */
+    public static List<ChecksumModel> getChecksumsByJar(File jarFile) {
+        List<ChecksumModel> dependencies = new ArrayList<>();
+        // 不解压读取压缩包中的文件内容
+        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(jarFile))) {
+            ZipEntry zipEntry;
+            Set<ChecksumModel> names = new HashSet<>();
+
+            // 循环遍历压缩包内文件对象
+            while ((zipEntry = zis.getNextEntry()) != null) {
+                ChecksumModel model = new ChecksumModel();
+                model.setDependency(zipEntry.getName().replace(FileUtils.LIB_JAR_DIR,""));
+                model.setChecksum(zipEntry.getCrc());
+                names.add(model);
+            }
+            names.stream()
+                    .filter(s -> s.getDependency().endsWith(FileUtils.JAR_SUFFIX))
+                    .collect(Collectors.toCollection(() -> dependencies));
+            return dependencies;
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return dependencies;
+    }
+
+    /**
      * 根据POM文件获取依赖集合
      * Warn：依赖不存在对应值的占位符将原样输出
      * e.g.：test-${no-exist-version}.jar
@@ -150,6 +183,24 @@ public class DependencyUtils {
     public static List<String> getDifferentDependencies(List<String> origin, List<String> target) {
         return target.stream().filter(not(origin::contains)).sorted().collect(Collectors.toList());
     }
+
+    public static boolean matchIgnoreVersion(String dependencyJarName) {
+        return StringUtils.isNotBlank(dependencyJarName) && dependencyJarName.matches(DEPENDENCY_JAR_NAME_REGEX);
+    }
+
+    public static List<String> getDifferentDependenciesSkipVersion(List<String> origin, List<String> target) {
+        List<String> skipVersionOrigin = origin.stream()
+                .map(u->u.replace(DEPENDENCY_JAR_NAME_REGEX, ""))
+                .collect(Collectors.toList());
+        List<String> skipVersionTarget = target.stream()
+                .map(u->u.replace(DEPENDENCY_JAR_NAME_REGEX, ""))
+                .collect(Collectors.toList());
+
+        return skipVersionTarget.stream()
+                .filter(not(skipVersionOrigin::contains))
+                .sorted().collect(Collectors.toList());
+    }
+
 
     /**
      * 获取相同依赖集合

@@ -1,6 +1,6 @@
 @endpoint=http://localhost:8080
 
-### 查询所有jar依赖
+### 查询所有jar依赖 (数据库)
 GET {{endpoint}}/api/jar/dependencies
 Content-Type: application/json
 

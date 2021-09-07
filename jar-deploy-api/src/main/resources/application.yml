@@ -29,7 +29,7 @@ spring:
     converters:
       preferred-json-mapper: fastjson
 
-jar:
-   apps-path: webapps
-   lib-path: webapps/lib
+
+jar-deploy:
+   root-path: target
    

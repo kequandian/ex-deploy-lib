@@ -7,18 +7,24 @@ import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
+import com.jfeat.jar.dependency.ZipFileUtils;
+import com.jfeat.jar.dependency.model.ChecksumModel;
 import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.util.Assert;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.FilenameFilter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -38,211 +44,325 @@ public class JarDeployEndpoint {
     @Autowired
     private JarDeployProperties jarDeployProperties;
 
-    @GetMapping("/libs")
-    @ApiOperation(value = "获取待装配的lib文件列表")
-    public Tip getLibs() {
-        String libPath = jarDeployProperties.getLibPath();
-        ArrayList<String> emptyArray  =new ArrayList<>();
+    @GetMapping("/jars")
+    @ApiOperation(value = "获取配置目录下所有jar文件")
+    public Tip getRootJars() {
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootPathFile = new File(rootPath);
+        logger.info("rootPath= {}", rootPathFile.getAbsolutePath());
+        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
 
-        File libPathFile = new File(libPath);
-        String fullPath =  libPathFile.getAbsolutePath();
-        logger.info(fullPath);
-
-        if(!libPathFile.exists()){
-            return SuccessTip.create(emptyArray);
-        }
-        File[] libsFiles = libPathFile.listFiles(new FilenameFilter() {
+        File[] jarFiles = rootPathFile.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File file, String s) {
                 return FilenameUtils.getExtension(s).equals("jar");
             }
         });
 
-        for(File f : libsFiles){
-            emptyArray.add(f.getName());
+        ArrayList<String> filesArray  =new ArrayList<>();
+        for(File f : jarFiles){
+            filesArray.add(f.getName());
         }
 
-        return SuccessTip.create(emptyArray);
+        return SuccessTip.create(filesArray);
     }
-    
 
-    @PostMapping("/lib/send")
-    @ApiOperation(value = "发送lib至目录", response = HashMap.class)
-    public Tip sendLib(@RequestPart("file") MultipartFile file) {
+    @GetMapping("/jars/{sub}")
+    @ApiOperation(value = "获取配置目录下指定目录下的所有jar文件")
+    @ApiImplicitParam(name = "sub", value = "查找子目录")
+    public Tip getJars(@PathVariable("sub") String subDir) {
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootPathFile = new File(rootPath);
+        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+
+        File subPathFile = new File(rootPath + File.separator + subDir);
+        logger.info("rootPath= {}", rootPathFile.getAbsolutePath());
+        //if(!subPathFile.exists()){
+        //    throw  new BusinessException(BusinessCode.BadRequest, "目录不存在: " + subDir);
+        //}
+        ArrayList<String> filesArray  =new ArrayList<>();
+
+        if(!subPathFile.exists()){
+            return SuccessTip.create(filesArray);
+        }
+
+        File[] jarFiles = subPathFile.listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File file, String s) {
+                return FilenameUtils.getExtension(s).equals("jar");
+            }
+        });
+
+        for(File f : jarFiles){
+            filesArray.add(f.getName());
+        }
+
+        return SuccessTip.create(filesArray);
+    }
+
+
+    @PostMapping("/jars/upload/{sub}")
+    @ApiOperation(value = "发送.jar至指定目录")
+    public Tip uploadJarFile(@RequestPart("file") MultipartFile file, @PathVariable("sub")String subDir) {
         if (file.isEmpty()) {
             throw new BusinessException(BusinessCode.BadRequest, "file is empty");
         }
-        String libPath = jarDeployProperties.getLibPath();
-        File libPathFile = new File(libPath);
-        if (!libPathFile.exists()) {
-            libPathFile.mkdirs();
-        }
-
-        String originalFileName = file.getOriginalFilename();
-        String extensionName = FilenameUtils.getExtension(originalFileName);
         Long fileSize = file.getSize();
         if(fileSize==0){
             throw new BusinessException(BusinessCode.BadRequest,  "file is empty");
         }
+        /// end sanity
 
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootPathFile = new File(rootPath);
+        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+
+        File subPathFile = new File(rootPath + File.separator + subDir);
+        if(!StringUtils.isEmpty(subDir)) {
+            if (!subPathFile.exists()) {
+                subPathFile.mkdirs();
+            }
+        }
+
+        String originalFileName = file.getOriginalFilename();
         try {
-            File target = new File(libPath + File.separator + originalFileName);
+            File target = new File(subPathFile.getAbsolutePath() + File.separator + originalFileName);
             String path = target.getCanonicalPath();
             boolean readable = target.setReadable(true);
             if(readable){
                 logger.info("file uploading to: {}", path);
                 FileUtils.copyInputStreamToFile(file.getInputStream(), target);
                 logger.info("file uploaded to: {}", target.getAbsolutePath());
+
+                // get relative path
+                File appFile = new File("./");
+                String relativePatht = target.getAbsolutePath();
+                relativePatht = relativePatht.substring(appFile.getAbsolutePath().length()-1, relativePatht.length());
+                logger.info("relativePatht={}", relativePatht);
+
+                return SuccessTip.create(relativePatht);
+
             }else{
                 throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
             }
         } catch (Exception e) {
-            throw new BusinessException(BusinessCode.UploadFileError);
+            throw new BusinessException(BusinessCode.GeneralIOError);
         }
-
-        return SuccessTip.create(new ArrayList<String>());
     }
 
 
     @GetMapping("/dependencies")
-    @ApiOperation(value = "查询lib的依赖", response = HashMap.class)
-    public Tip queryLibDependencies(@RequestParam("lib") String libFileName) {
-        String libPath = jarDeployProperties.getLibPath();
+    @ApiOperation(value = "查询jar的依赖")
+    public Tip queryJarDependencies(@RequestParam("jar") String jarFileName) {
+        String rootPath = jarDeployProperties.getRootPath();
+        File jarFile = new File(rootPath + File.separator + jarFileName);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
+        }
 
-        File target = new File(libPath + File.separator + libFileName);
-        boolean readable = target.setReadable(true);
-        if(readable){
-            List<String> libDependencies = DependencyUtils.getDependenciesByJar(target);
-            return SuccessTip.create(libDependencies);
+        if(jarFile.setReadable(true)){
+            List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
+            if(libDependencies!=null && libDependencies.size()>0) {
+                return SuccessTip.create(libDependencies);
+            }
+            return SuccessTip.create(new ArrayList<String>());
+        }else{
+            throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
+        }
+    }
+    @GetMapping("/dependencies/{sub}")
+    @ApiOperation(value = "查询jar的依赖")
+    public Tip queryJarDependencies(@PathVariable("sub") String subDir, @RequestParam("jar") String jarFileName) {
+        String rootPath = jarDeployProperties.getRootPath();
+        File jarFile = new File(rootPath + File.separator + subDir + File.separator + jarFileName);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
+        }
+        if(jarFile.setReadable(true)){
+            List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
+            if(libDependencies!=null && libDependencies.size()>0) {
+                return SuccessTip.create(libDependencies);
+            }
+            return SuccessTip.create(new ArrayList<String>());
         }else{
             throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
         }
     }
 
-    @GetMapping("/dependencies/app")
-    @ApiOperation(value = "查询standalone的依赖", response = JSONArray.class)
-    public Tip queryAppDependencies() {
-        String appPath = jarDeployProperties.getAppsPath();
-        File appPathFile = new File(appPath);
-
-        // get app.jar or *-standalone.jar
-        File[] libsFiles = appPathFile.listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File file, String s) {
-                return s.equals("app.jar") ||
-                        s.endsWith("-standalone.jar");
-            }
-        });
-        ArrayList<String> emptyArray  =new ArrayList<>();
-        if(libsFiles==null || libsFiles.length==0){
-            return SuccessTip.create(emptyArray);
-        }
-        if(libsFiles.length>1){
-            for(File ss : libsFiles){
-                emptyArray.add(ss.getName());
-            }
-            return SuccessTip.create(emptyArray);
+    @GetMapping("/checksum")
+    @ApiOperation(value = "查询lib所有依赖的checksum")
+    public Tip rootChecksum(@RequestParam("jar") String jarFileName) {
+        String rootPath = jarDeployProperties.getRootPath();
+        File jarFile = new File(rootPath + File.separator + jarFileName);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
         }
 
-        File target = libsFiles[0];
-        boolean readable = target.setReadable(true);
-        if(readable){
-            List<String> libDependencies = DependencyUtils.getDependenciesByJar(target);
-            return SuccessTip.create(libDependencies);
+        if(jarFile.setReadable(true)){
+            List<ChecksumModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
+            if(libDependencies!=null && libDependencies.size()>0) {
+                return SuccessTip.create(libDependencies);
+            }
+            return SuccessTip.create(new ArrayList<ChecksumModel>());
         }else{
             throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
         }
     }
 
-    @GetMapping("/lib/sanity")
-    @ApiOperation(value = "检查lib是否可装配", response = JSONArray.class)
-    public Tip queryLibSanity(@RequestParam("lib") String libFileName) {
-        String libPath = jarDeployProperties.getLibPath();
+    @GetMapping("/checksum/{sub}")
+    @ApiOperation(value = "查询lib所有依赖的checksum")
+    public Tip libChecksum(@PathVariable("sub")String subDir, @RequestParam("jar") String jarFileName) {
+        String rootPath = jarDeployProperties.getRootPath();
 
-        try {
-            File target = new File(libPath + File.separator + libFileName);
-            String path = target.getCanonicalPath();
-            boolean readable = target.setReadable(true);
-            if(readable){
-                File appFile = jarDeployProperties.getStandaloneFile();
-                if(appFile!=null) {
-                    List<String> appDependencies = DependencyUtils.getDependencies(appFile.getAbsolutePath());
-                    List<String> libDependencies = DependencyUtils.getDependenciesByJar(target);
-                    List<String> diffDependencies = DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
-
-                    if (diffDependencies != null && diffDependencies.size() > 0) {
-                        // mismatch, just delete the file
-                        FileUtils.forceDelete(target);
-                        return SuccessTip.create(diffDependencies);
-                    }
-                }
-            }else{
-                throw new BusinessException(BusinessCode.FileReadingError, "file is not readable");
+        File target = new File(rootPath + File.separator + subDir + File.separator + jarFileName);
+        boolean readable = target.setReadable(true);
+        if (readable) {
+            List<ChecksumModel> libDependencies = DependencyUtils.getChecksumsByJar(target);
+            if(libDependencies!=null && libDependencies.size()>0) {
+                return SuccessTip.create(libDependencies);
             }
+            //List<Long> libChecksums = ZipFileUtils.UnzipWithChecksum(target);
+            return SuccessTip.create(new ArrayList<ChecksumModel>());
+        } else {
+            throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
+        }
+    }
 
-        } catch (Exception e) {
+
+    @GetMapping("/mismatch")
+    @ApiOperation(value = "检查两个JAR的依赖是否匹配")
+    public Tip mismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
+
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootJarFile = new File(rootPath + File.separator + baseJar);
+        if(!rootJarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!rootJarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
+        }
+        File jarFile = new File(rootPath + File.separator + jar);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!jarFile.setReadable(true)){
             throw new BusinessException(BusinessCode.FileReadingError);
         }
 
+        // match dependencies
+        {
+            List<String> appDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
+            List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
+
+            List<String> diffDependencies = DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
+
+            if (diffDependencies != null && diffDependencies.size() > 0) {
+                // mismatch, just delete the file
+                //FileUtils.forceDelete(target);
+                return SuccessTip.create(diffDependencies);
+            }
+        }
+        return SuccessTip.create(new ArrayList<String>());
+    }
+
+    @GetMapping("/match")
+    @ApiOperation(value = "检查两个JAR的依赖是否匹配")
+    public Tip matchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
+
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootJarFile = new File(rootPath + File.separator + baseJar);
+        if(!rootJarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!rootJarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
+        }
+        File jarFile = new File(rootPath + File.separator + jar);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!jarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
+        }
+
+        // match dependencies
+        {
+            List<String> appDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
+            List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
+
+            List<String> diffDependencies = DependencyUtils.getSameDependencies(appDependencies, libDependencies);
+
+            if (diffDependencies != null && diffDependencies.size() > 0) {
+                // mismatch, just delete the file
+                //FileUtils.forceDelete(target);
+                return SuccessTip.create(diffDependencies);
+            }
+        }
         return SuccessTip.create(new ArrayList<String>());
     }
 
 
-    @PostMapping("/app/depand/lib")
-    @ApiOperation(value = "装配lib.jar至应用standalone.jar", response = HashMap.class)
-    public Tip deployLib(@RequestPart("file") MultipartFile file) {
-        if (file.isEmpty()) {
-            throw new BusinessException(BusinessCode.BadRequest,  "file is empty");
-        }
-        String appsPath = jarDeployProperties.getAppsPath();
-        String libPath = jarDeployProperties.getLibPath();
+    @GetMapping("/normalize/{jar}")
+    @ApiOperation(value = "规范化jar的路径为标准lib")
+    public Tip normalizeJar(@PathVariable("jar") String jar) {
 
-        String originalFileName = file.getOriginalFilename();
-        String extensionName = FilenameUtils.getExtension(originalFileName);
-        Long fileSize = file.getSize();
-        if(fileSize==0){
-            throw new BusinessException(BusinessCode.BadRequest,  "file is empty");
+        final String LIB = "BOOT-INF/lib";
+
+        String rootPath = jarDeployProperties.getRootPath();
+        File jarFile = new File(rootPath + File.separator + jar);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!jarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
         }
 
+        File libFile = new File(rootPath + File.separator + LIB + File.separator + jarFile.getName());
         try {
-            String fileSavePath = appsPath + File.separator + libPath;
-            File fileSavePath_f = new File(fileSavePath);
-            if (!fileSavePath_f.exists()) {
-                fileSavePath_f.mkdirs();
+            FileUtils.moveFile(jarFile, libFile);
+            if(libFile.exists()) {
+                return SuccessTip.create(libFile);
             }
 
-            File target = new File(fileSavePath + File.separator + originalFileName);
-            String path = target.getCanonicalPath();
-            boolean readable = target.setReadable(true);
-            if(readable){
-                logger.info("file uploading to: {}", path);
-                FileUtils.copyInputStreamToFile(file.getInputStream(), target);
-                logger.info("file uploaded to: {}", target.getAbsolutePath());
+            return SuccessTip.create();
 
-                // check dependencies
-                File appFile = jarDeployProperties.getStandaloneFile();
-                List<String> appDependencies = DependencyUtils.getDependencies(appFile.getAbsolutePath());
-                List<String> libDependencies = DependencyUtils.getDependenciesByJar(target);
-                List<String> diffDependencies = DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
+        }catch (IOException e){
+            throw new BusinessException(BusinessCode.GeneralIOError, "move file error!");
+        }
+    }
 
-                if(diffDependencies!=null && diffDependencies.size()>0) {
-                    // mismatch, just delete the file
-                    FileUtils.forceDelete(target);
-                    return SuccessTip.create(diffDependencies);
-                }
 
-                // allow inject
-                // just wait for cron to deploy the lib
-                //ZipFileUtils.addFilesToZip(appFile, new File[]{target});
-
-            }else{
-                throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
-            }
-        } catch (Exception e) {
-            throw new BusinessException(BusinessCode.UploadFileError);
+    @PostMapping("/merge/{baseJar}/{jar}")
+    @ApiOperation(value = "装配lib.jar至应用standalone.jar")
+    public Tip mergeJars(@PathVariable("baseJar") String baseJar, @PathVariable("jar") String jar) {
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootJarFile = new File(rootPath + File.separator + baseJar);
+        if(!rootJarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!rootJarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
+        }
+        File jarFile = new File(rootPath + File.separator + jar);
+        if(!jarFile.exists()){
+            throw new BusinessException(BusinessCode.FileNotFound);
+        }
+        if(!jarFile.setReadable(true)){
+            throw new BusinessException(BusinessCode.FileReadingError);
         }
 
-        //return SuccessTip.create(JSONArray.parseArray("[]"));
-        return SuccessTip.create(new ArrayList<String>());
+        // check dependencies
+        List<String> appDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
+        List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
+        List<String> diffDependencies = DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
+        if(diffDependencies!=null && diffDependencies.size()>0){
+            throw new BusinessException(BusinessCode.Reserved2, "依赖不匹配, 禁止更新jar!");
+        }
+
+        // allow inject
+        // just wait for cron to deploy the lib
+        ZipFileUtils.addFilesToZip(rootJarFile, new File[]{jarFile});
+
+        return SuccessTip.create(jarFile);
     }
 }
