@@ -229,9 +229,11 @@ public class JarDeployEndpoint {
     }
 
 
-    @GetMapping("/mismatch")
+    @GetMapping("/dependency/mismatch")
     @ApiOperation(value = "检查两个JAR的依赖是否匹配")
-    public Tip mismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
+    @ApiImplicitParam(name = "version", value = "是否匹配-version", defaultValue = "False")
+    public Tip mismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar, 
+                            @RequestParam("version") Boolean version) {
 
         String rootPath = jarDeployProperties.getRootPath();
         File rootJarFile = new File(rootPath + File.separator + baseJar);
@@ -254,7 +256,8 @@ public class JarDeployEndpoint {
             List<String> appDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
             List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
 
-            List<String> diffDependencies = DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
+            List<String> diffDependencies = version ? DependencyUtils.getDifferentDependencies(appDependencies, libDependencies) 
+                                                     : DependencyUtils.getDifferentDependenciesIgnoreVersion(appDependencies, libDependencies);
 
             if (diffDependencies != null && diffDependencies.size() > 0) {
                 // mismatch, just delete the file
@@ -265,7 +268,7 @@ public class JarDeployEndpoint {
         return SuccessTip.create(new ArrayList<String>());
     }
 
-    @GetMapping("/match")
+    @GetMapping("/dependency/match")
     @ApiOperation(value = "检查两个JAR的依赖是否匹配")
     public Tip matchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
 
@@ -300,6 +303,10 @@ public class JarDeployEndpoint {
         }
         return SuccessTip.create(new ArrayList<String>());
     }
+
+
+
+    /// deploy 
 
 
     @GetMapping("/normalize/{jar}")

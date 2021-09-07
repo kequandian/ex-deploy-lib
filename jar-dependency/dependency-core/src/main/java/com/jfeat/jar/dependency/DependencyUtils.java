@@ -184,23 +184,26 @@ public class DependencyUtils {
         return target.stream().filter(not(origin::contains)).sorted().collect(Collectors.toList());
     }
 
-    public static boolean matchIgnoreVersion(String dependencyJarName) {
-        return StringUtils.isNotBlank(dependencyJarName) && dependencyJarName.matches(DEPENDENCY_JAR_NAME_REGEX);
-    }
+    public static List<String> getDifferentDependenciesIgnoreVersion(List<String> origin, List<String> target) {
+        final String regrex = "(-[0-9\\.]+)([\\-\\.\\w]*).jar";
+        final String regrex$ = "(-\\$\\{[\\w\\.\\-]+\\}).jar";
 
-    public static List<String> getDifferentDependenciesSkipVersion(List<String> origin, List<String> target) {
-        List<String> skipVersionOrigin = origin.stream()
-                .map(u->u.replace(DEPENDENCY_JAR_NAME_REGEX, ""))
+        var queryOrigin = origin.stream()
+                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"))
                 .collect(Collectors.toList());
-        List<String> skipVersionTarget = target.stream()
-                .map(u->u.replace(DEPENDENCY_JAR_NAME_REGEX, ""))
+        //queryOrigin.forEach(u->{System.out.println(u.toString());});
+
+        var queryTargetStream = target.stream()
+                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"));
+        //.collect(Collectors.toList());
+
+        var query = queryTargetStream
+                .filter(not(queryOrigin::contains))
+                .sorted()
                 .collect(Collectors.toList());
-
-        return skipVersionTarget.stream()
-                .filter(not(skipVersionOrigin::contains))
-                .sorted().collect(Collectors.toList());
+        //query.forEach(u->{System.out.println(u.toString());});
+        return query;
     }
-
 
     /**
      * 获取相同依赖集合

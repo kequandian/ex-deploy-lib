@@ -1,5 +1,6 @@
 .vscode/
 *.iml
+.DS_Store
 target/
 .idea/
 .project
