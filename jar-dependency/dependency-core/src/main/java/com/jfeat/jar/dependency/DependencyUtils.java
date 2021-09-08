@@ -1,5 +1,6 @@
 package com.jfeat.jar.dependency;
 
+import com.alibaba.fastjson.JSONObject;
 import com.jfeat.jar.dependency.model.ChecksumModel;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Model;
@@ -9,6 +10,7 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.net.PortUnreachableException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -133,6 +135,15 @@ public class DependencyUtils {
         }
         return dependencies;
     }
+    public static JSONObject convertChecksumToJSON(List<ChecksumModel> checksums){
+        JSONObject result = new JSONObject();
+
+        checksums.stream().forEach(u->{
+            result.put(u.getDependency(), u.getChecksum());
+        });
+        return result;
+    }
+
 
     /**
      * 根据POM文件获取依赖集合
@@ -159,14 +170,18 @@ public class DependencyUtils {
             List<String> dependencies = new ArrayList<>();
             final Properties properties = model.getProperties();
             model.getDependencies().forEach(d -> {
-                var v = d.getVersion();
-                // 转换version信息
-                v = (v != null ? "-" + (v.startsWith("$") ? properties.getOrDefault(v.substring(v.indexOf("{") + 1, v.lastIndexOf("}")), v) : v) : "");
-                // 生成依赖信息
-                dependencies.add(d.getArtifactId()
-                        .concat(v)
-                        .concat(".")
-                        .concat(d.getType()));
+                if("test".equals(d.getScope())){
+                    // do nothing
+                } else {
+                    var v = d.getVersion();
+                    // 转换version信息
+                    v = (v != null ? "-" + (v.startsWith("$") ? properties.getOrDefault(v.substring(v.indexOf("{") + 1, v.lastIndexOf("}")), v) : v) : "");
+                    // 生成依赖信息
+                    dependencies.add(d.getArtifactId()
+                            .concat(v)
+                            .concat(".")
+                            .concat(d.getType()));
+                }
             });
             return dependencies;
         }
@@ -182,6 +197,13 @@ public class DependencyUtils {
      */
     public static List<String> getDifferentDependencies(List<String> origin, List<String> target) {
         return target.stream().filter(not(origin::contains)).sorted().collect(Collectors.toList());
+    }
+
+    public static List<ChecksumModel> getDifferentChecksums(List<ChecksumModel> origin, List<ChecksumModel> target) {
+        JSONObject originHash = convertChecksumToJSON(origin);
+        return target.stream().filter(u->{
+            return ! originHash.get(u.getDependency()).equals(u.getChecksum());
+        }).sorted().collect(Collectors.toList());
     }
 
     public static List<String> getDifferentDependenciesIgnoreVersion(List<String> origin, List<String> target) {
