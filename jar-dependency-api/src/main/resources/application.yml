@@ -29,7 +29,6 @@ spring:
     converters:
       preferred-json-mapper: fastjson
 
-
-jar-deploy:
-   root-path: target
+jar-dependency:
+   root-path: jar-dependency-api/target
    

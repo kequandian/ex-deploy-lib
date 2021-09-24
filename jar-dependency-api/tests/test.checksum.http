@@ -1,0 +1,23 @@
+### checksum
+@endpoint=http://localhost:8080
+
+### 查询jar依赖+checksum
+GET {{endpoint}}/api/jar/dep/checksum
+?jar=jar-dependency-api-1.0.0-standalone.jar
+Content-Type: application/json
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/dep/checksum
+?jar=jar-dependency-api-1.0.0.jar
+Content-Type: application/json
+
+
+### 依据checksum检查两个jar的更新依赖
+GET {{endpoint}}/api/jar/deploy/checksum/mismatch
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+Content-Type: application/json
+
+
+
+
+

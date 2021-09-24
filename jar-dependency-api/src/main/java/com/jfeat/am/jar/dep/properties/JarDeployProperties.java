@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 @Data
 @Component
 @Accessors(chain = true)
-@ConfigurationProperties(prefix = "jar-dependency")
+@ConfigurationProperties(prefix = "jarDependency")
 public class JarDeployProperties {
     /**
      * 应用路径
@@ -25,4 +25,17 @@ public class JarDeployProperties {
      *  用于初始化数据库的路径
      */
     String flywayPath;
+
+    public String getRootPath(){
+        return this.rootPath;
+    }
+    public void setRootPath(String rootPath){
+        this.rootPath = rootPath;
+    }
+    public String getFlywayPath(){
+        return this.flywayPath;
+    }
+    public void setFlywayPath(String flywayPath){
+        this.flywayPath = flywayPath;
+    }
 }

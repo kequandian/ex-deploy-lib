@@ -1,0 +1,30 @@
+### 查询jar依赖
+@endpoint=http://localhost:8080
+
+### search - 可选项
+GET {{endpoint}}/api/jar/dep
+?jar=jar-dependency-api-1.0.0-standalone.jar
+&pattern=
+Content-Type: application/json
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/dep
+?jar=jar-dependency-api-1.0.0.jar
+&pattern=
+Content-Type: application/json
+
+### 检查lib的不匹配项
+### majar=true 跳过版本号的比较
+GET {{endpoint}}/api/jar/dep/mismatch
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+//&major=true
+&major=false
+Content-Type: application/json
+
+
+### 返回两个JAR的匹配项
+GET {{endpoint}}/api/jar/dep/match
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+&major=true
+Content-Type: application/json

@@ -3,19 +3,17 @@ package com.jfeat.jar.dependency;
 import com.alibaba.fastjson.JSONObject;
 import com.jfeat.jar.dependency.model.ChecksumModel;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
+import javax.naming.CompositeName;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.PortUnreachableException;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Properties;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -135,15 +133,6 @@ public class DependencyUtils {
         }
         return dependencies;
     }
-    public static JSONObject convertChecksumToJSON(List<ChecksumModel> checksums){
-        JSONObject result = new JSONObject();
-
-        checksums.stream().forEach(u->{
-            result.put(u.getDependency(), u.getChecksum());
-        });
-        return result;
-    }
-
 
     /**
      * 根据POM文件获取依赖集合
@@ -200,10 +189,15 @@ public class DependencyUtils {
     }
 
     public static List<ChecksumModel> getDifferentChecksums(List<ChecksumModel> origin, List<ChecksumModel> target) {
-        JSONObject originHash = convertChecksumToJSON(origin);
-        return target.stream().filter(u->{
-            return ! originHash.get(u.getDependency()).equals(u.getChecksum());
-        }).sorted().collect(Collectors.toList());
+        return target.stream()
+                .filter(u-> {
+                    for(ChecksumModel checksum : origin){
+                        return checksum.getChecksum() != u.getChecksum();
+                    }
+                    return false;
+                })
+                .sorted()
+                .collect(Collectors.toList());
     }
 
     public static List<String> getDifferentDependenciesIgnoreVersion(List<String> origin, List<String> target) {
@@ -215,11 +209,9 @@ public class DependencyUtils {
                 .collect(Collectors.toList());
         //queryOrigin.forEach(u->{System.out.println(u.toString());});
 
-        var queryTargetStream = target.stream()
-                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"));
-        //.collect(Collectors.toList());
 
-        var query = queryTargetStream
+        var query = target.stream()
+                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"))
                 .filter(not(queryOrigin::contains))
                 .sorted()
                 .collect(Collectors.toList());
@@ -235,7 +227,30 @@ public class DependencyUtils {
      * @return java.util.List<java.lang.String>
      */
     public static List<String> getSameDependencies(List<String> origin, List<String> target) {
-        return origin.stream().filter(target::contains).sorted().collect(Collectors.toList());
+        return target.stream()
+                .filter(origin::contains)
+                .sorted()
+                .collect(Collectors.toList());
+    }
+
+    public static List<Map.Entry<String,String>> getSameDependenciesIgnoreVersion(List<String> origin, List<String> target) {
+        final String regrex = "(-[0-9\\.]+)([\\-\\.\\w]*).jar";
+        final String regrex$ = "(-\\$\\{[\\w\\.\\-]+\\}).jar";
+
+        var query = target.stream()
+                .map(jar->{
+                    String key = jar.replaceFirst(regrex, "").replaceFirst(regrex$,"");
+                    for(String it : origin ){
+                        if(it.startsWith(key)){
+                            return Map.entry(jar, it);
+                        }
+                    }
+                    return Map.entry(jar, "");
+                })
+                .filter(pair->pair.getValue().length()>0)
+                .collect(Collectors.toList());
+
+        return query;
     }
 
     /**

@@ -1,7 +1,7 @@
 @endpoint=http://localhost:8080
 
 ### 发送jar文件至lib目录
-POST {{endpoint}}/api/jar/deploy/jars/upload/lib
+POST {{endpoint}}/api/jar/dep/jars/upload/lib
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
 
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB
@@ -14,61 +14,23 @@ Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar
 < ./target/jar-deploy-api-1.0.0.jar
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB--
 
-
-
 ### 查询根目录下的JAR
-GET {{endpoint}}/api/jar/deploy/jars
+GET {{endpoint}}/api/jar/dep/jars
 Content-Type: application/json
 ### 查询指定目录下的JAR
-GET {{endpoint}}/api/jar/deploy/jars/lib
+GET {{endpoint}}/api/jar/dep/jars/lib
 Content-Type: application/json
 
 
 
-### 查询jar依赖
-### search - 可选项
-GET {{endpoint}}/api/jar/deploy/dependencies
-?jar=jar-deploy-api-1.0.0-standalone.jar
-&search=spring-boot-starter
-Content-Type: application/json
-### 查询指定目录lib下的jar依赖
-GET {{endpoint}}/api/jar/deploy/dependencies
-?jar=jar-deploy-api-1.0.0.jar
-Content-Type: application/json
-
-### 检查lib的不匹配项
-GET {{endpoint}}/api/jar/deploy/dependency/mismatch
-?baseJar=jar-deploy-api-1.0.0-standalone.jar
-&jar=jar-deploy-api-1.0.0.jar
-Content-Type: application/json
-### 检查lib新项 (忽略VERSION比较)
-GET {{endpoint}}/api/jar/deploy/dependency/new
-?baseJar=jar-deploy-api-1.0.0-standalone.jar
-&jar=jar-deploy-api-1.0.0.jar
-Content-Type: application/json
-
-### 返回两个JAR的匹配项
-GET {{endpoint}}/api/jar/deploy/dependency/match
-?baseJar=jar-deploy-api-1.0.0-standalone.jar
-&jar=jar-deploy-api-1.0.0.jar
+### 自动查找standalone部署
+POST {{endpoint}}/api/jar/dep/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
 Content-Type: application/json
 
 
-### checksum
-
-### 查询jar依赖+checksum
-GET {{endpoint}}/api/jar/deploy/checksum
-?jar=jar-deploy-api-1.0.0-standalone.jar
-Content-Type: application/json
-### 查询指定目录lib下的jar依赖
-GET {{endpoint}}/api/jar/deploy/checksum/lib
-?jar=jar-deploy-api-1.0.0.jar
-Content-Type: application/json
-
-### 依据checksum检查两个jar的更新依赖
-GET {{endpoint}}/api/jar/deploy/checksum/mismatch
-?baseJar=jar-deploy-api-1.0.0-standalone.jar
-&jar=jar-deploy-api-1.0.0.jar
+### 对比两个jar注入 (TBD)
+//POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
+POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
 Content-Type: application/json
 
 
@@ -83,21 +45,3 @@ Content-Type: application/json
 //
 POST {{endpoint}}/api/jar/deploy/to/amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=/from/bGliL2phci1kZXBsb3ktYXBpLTEuMC4wLmphcg==
 Content-Type: application/json
-
-
-
-### TODO
-
-### 自动查找standalone部署
-POST {{endpoint}}/api/jar/deploy/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
-Content-Type: application/json
-
-### 从standalone.JAR中移除lib
-DELETE {{endpoint}}/api/jar/deploy/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
-Content-Type: application/json
-
-### 对比两个jar注入 (TBD)
-//POST {{endpoint}}/api/jar/deploy/checksum/to/{prodJar}/from/{uatJar}
-POST {{endpoint}}/api/jar/deploy/checksum/to/{prodJar}/from/{uatJar}
-Content-Type: application/json
-
