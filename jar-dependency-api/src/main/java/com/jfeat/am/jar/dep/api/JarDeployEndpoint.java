@@ -1,8 +1,9 @@
-package com.jfeat.am.jar.deploy.api;
+package com.jfeat.am.jar.dep.api;
 
-import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
-import com.jfeat.am.jar.deploy.properties.JarDeployProperties;
+import com.jfeat.am.jar.dep.properties.JarDeployProperties;
+import com.jfeat.am.jar.dep.request.JarRequest;
+import com.jfeat.am.jar.dep.util.DepUtils;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.SuccessTip;
@@ -13,12 +14,12 @@ import com.jfeat.jar.dependency.model.ChecksumModel;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.ApiParam;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Required;
 import org.springframework.util.Assert;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -29,7 +30,6 @@ import java.io.FilenameFilter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -40,8 +40,8 @@ import java.util.stream.Collectors;
  * @date 2020-08-05
  */
 @RestController
-@Api("/api/jar/deploy")
-@RequestMapping("/api/jar/deploy")
+@Api("/api/jar/dep")
+@RequestMapping("/api/jar/dep")
 public class JarDeployEndpoint {
     protected final static Logger logger = LoggerFactory.getLogger(JarDeployEndpoint.class);
 
@@ -155,10 +155,10 @@ public class JarDeployEndpoint {
     }
 
 
-    @GetMapping("/dependencies")
+    @GetMapping
     @ApiOperation(value = "查询jar的依赖")
     public Tip queryJarDependencies(@RequestParam("jar") String jarFileName,
-                                    @RequestParam(name="search", required = false)String search) {
+                                    @RequestParam(name="search", required = false) String search) {
         String rootPath = jarDeployProperties.getRootPath();
         File jarFile = new File(rootPath + File.separator + jarFileName);
         if(!jarFile.exists()){
@@ -177,7 +177,7 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
         }
     }
-    @GetMapping("/dependencies/{sub}")
+    @GetMapping("/{sub}")
     @ApiOperation(value = "查询jar的依赖")
     public Tip queryJarDependencies(@PathVariable("sub") String subDir,
                                     @RequestParam("jar") String jarFileName,
@@ -199,6 +199,7 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
         }
     }
+
 
     @GetMapping("/checksum")
     @ApiOperation(value = "查询lib所有依赖的checksum")
@@ -241,8 +242,9 @@ public class JarDeployEndpoint {
         }
     }
 
-
-    private List<String> getMismatchJars(String baseJar, String jar, boolean skipVersion){
+    @GetMapping("/checksum/mismatch")
+    @ApiOperation(value = "依据checksum检查两个jar的更新依赖")
+    public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
         String rootPath = jarDeployProperties.getRootPath();
         File rootJarFile = new File(rootPath + File.separator + baseJar);
         if(!rootJarFile.exists()){
@@ -259,16 +261,22 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.FileReadingError);
         }
 
-        List<String> appDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
-        List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
-        return skipVersion ? DependencyUtils.getDifferentDependenciesIgnoreVersion(appDependencies, libDependencies)
-                : DependencyUtils.getDifferentDependencies(appDependencies, libDependencies);
+        // get mismatch
+        List<ChecksumModel> baseJarChecksum = DependencyUtils.getChecksumsByJar(rootJarFile);
+        List<ChecksumModel> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
+
+        return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
     }
 
-    @GetMapping("/dependency/mismatch")
+    @GetMapping("/mismatch")
     @ApiOperation(value = "检查两个JAR的依赖是否匹配")
-    public Tip mismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
-        List<String> diffDependencies = getMismatchJars(baseJar, jar, false);
+    public Tip mismatchJars(@RequestParam("baseJar") String baseJar,
+                             @RequestParam("jar") String jar,
+                            @ApiParam(name = "major", value = "仅匹配库名,不匹配版本号")
+                                @RequestParam(value = "major", required = false) boolean major
+                            ) {
+        String rootPath = jarDeployProperties.getRootPath();
+        List<String> diffDependencies = DepUtils.getMismatchJars(rootPath, baseJar, jar, major);
         if (diffDependencies != null && diffDependencies.size() > 0) {
             // mismatch, just delete the file
             //FileUtils.forceDelete(target);
@@ -277,19 +285,7 @@ public class JarDeployEndpoint {
         return SuccessTip.create(new ArrayList<String>());
     }
 
-    @GetMapping("/dependency/new")
-    @ApiOperation(value = "检查两个JAR的依赖是否匹配,忽略版本号比较,找出新依赖")
-    public Tip mismatchJarsForNewOnes(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
-        List<String> diffDependencies = getMismatchJars(baseJar, jar, true);
-        if (diffDependencies != null && diffDependencies.size() > 0) {
-            // mismatch, just delete the file
-            //FileUtils.forceDelete(target);
-            return SuccessTip.create(diffDependencies);
-        }
-        return SuccessTip.create(new ArrayList<String>());
-    }
-
-    @GetMapping("/dependency/match")
+    @GetMapping("/match")
     @ApiOperation(value = "检查两个JAR的依赖是否匹配")
     public Tip matchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
         String rootPath = jarDeployProperties.getRootPath();
@@ -325,32 +321,42 @@ public class JarDeployEndpoint {
     }
 
 
-    @GetMapping("/checksum/mismatch")
-    @ApiOperation(value = "依据checksum检查两个jar的更新依赖")
-    public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
+    /// deploy
+
+    @PostMapping("/detach")
+    @ApiOperation(value = "从.jar中解压匹配文件至指定目录")
+    public Tip downloadJarFile(@RequestBody JarRequest request) {
         String rootPath = jarDeployProperties.getRootPath();
-        File rootJarFile = new File(rootPath + File.separator + baseJar);
-        if(!rootJarFile.exists()){
-            throw new BusinessException(BusinessCode.FileNotFound);
-        }
-        if(!rootJarFile.setReadable(true)){
-            throw new BusinessException(BusinessCode.FileReadingError);
-        }
-        File jarFile = new File(rootPath + File.separator + jar);
-        if(!jarFile.exists()){
-            throw new BusinessException(BusinessCode.FileNotFound);
-        }
-        if(!jarFile.setReadable(true)){
-            throw new BusinessException(BusinessCode.FileReadingError);
-        }
+        File rootJarFile = new File(rootPath + File.separator + request.getJar());
 
-        // get mismatch
-        List<ChecksumModel> baseJarChecksum = DependencyUtils.getChecksumsByJar(rootJarFile);
-        List<ChecksumModel> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
-
-        return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
+        long checksum = 0;
+        try {
+            checksum += ZipFileUtils.UnzipWithChecksum(rootJarFile, request.getPattern());
+        }catch (IOException e){
+            throw new BusinessException(BusinessCode.GeneralIOError);
+        }
+        return SuccessTip.create(checksum);
     }
 
+    @PostMapping("/decompile")
+    @ApiOperation(value = "反编译指定的文件")
+    public Tip decompileJarFile(@RequestBody JarRequest request) {
+        String rootPath = jarDeployProperties.getRootPath();
+
+        //ZipFileUtils.UnzipWithChecksum();
+
+        return SuccessTip.create(new ArrayList<String>());
+    }
+
+    @PostMapping("/deploy")
+    @ApiOperation(value = "反编译指定的文件")
+    public Tip compileJarFile(@RequestBody JarRequest request) {
+        String rootPath = jarDeployProperties.getRootPath();
+
+        //ZipFileUtils.UnzipWithChecksum();
+
+        return SuccessTip.create(new ArrayList<String>());
+    }
 
     /**
      * start to deploy the lib jar to standalone jar
@@ -358,7 +364,7 @@ public class JarDeployEndpoint {
      * @param jar64  base64Encoded
      * @return
      */
-    @PostMapping("/to/{baseJar64}/from/{jar64}")
+    @PostMapping("/deploy/{baseJar64}/from/{jar64}")
     @ApiOperation(value = "同步依赖装配lib.jar至应用standalone.jar")
     public Tip mergeJars(@PathVariable("baseJar64") String baseJar64, @PathVariable("jar64") String jar64) {
         String baseJar = new String(Base64.getDecoder().decode(baseJar64));
@@ -376,7 +382,7 @@ public class JarDeployEndpoint {
         if(!jarFile.exists()){
             throw new BusinessException(BusinessCode.FileNotFound);
         }
-        File libFile = convertToLibJar(jarFile);
+        File libFile = DepUtils.convertToLibJar(jarFile, rootPath);
         if(!libFile.setReadable(true)){
             throw new BusinessException(BusinessCode.FileReadingError);
         }
@@ -386,6 +392,7 @@ public class JarDeployEndpoint {
         List<String> baseJarDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
         List<String> libDependencies = DependencyUtils.getDependenciesByJar(libFile);
         List<String> diffDependencies = DependencyUtils.getDifferentDependenciesIgnoreVersion(baseJarDependencies, libDependencies);
+
         if(diffDependencies!=null && diffDependencies.size()>0){
             diffDependencies.forEach(u->logger.debug("dependency= {}",u));
             throw new BusinessException(BusinessCode.Reserved2, "依赖不匹配, 禁止更新jar!");
@@ -396,32 +403,5 @@ public class JarDeployEndpoint {
         ZipFileUtils.addFilesToZip(rootJarFile, new File[]{libFile});
 
         return SuccessTip.create(libFile.getAbsolutePath().replace((new File(rootPath).getAbsolutePath()+File.separator), ""));
-    }
-
-    /**
-     * deploy
-     * @param jarFile
-     * @return
-     */
-    private File convertToLibJar(File jarFile) {
-        final String LIB = "BOOT-INF/lib";
-        String rootPath = jarDeployProperties.getRootPath();
-        File libFile = new File(rootPath + File.separator + LIB + File.separator + jarFile.getName());
-        if(libFile.exists()) {
-            try {
-                FileUtils.forceDelete(libFile);
-                FileUtils.moveFile(jarFile, libFile);
-            } catch (IOException e) {
-                throw new BusinessException(BusinessCode.GeneralIOError, "delete file error: " +e.getMessage());
-            }
-        }else{
-            try {
-                FileUtils.moveFile(jarFile, libFile);
-            } catch (IOException e) {
-                throw new BusinessException(BusinessCode.GeneralIOError, "move file error:"+e.getMessage());
-            }
-        }
-
-        return libFile;
     }
 }

@@ -25,7 +25,7 @@
     <dependencies>
         <dependency>
             <groupId>com.jfeat</groupId>
-            <artifactId>dependency-core</artifactId>
+            <artifactId>jar-dependency</artifactId>
             <version>1.0.0</version>
         </dependency>
 
