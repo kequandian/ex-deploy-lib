@@ -33,6 +33,7 @@ import java.io.*;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.zip.Adler32;
 import java.util.zip.CheckedInputStream;
@@ -252,12 +253,12 @@ public class JarDeployEndpoint {
         }
 
         //HashCode md5 = Files.hash(jarFile, Hashing.md5());
-        return SuccessTip.create(Files.hash(jarFile, Hashing.crc32()).padToLong());
+        return SuccessTip.create(Map.entry("checksum", Files.hash(jarFile, Hashing.crc32()).padToLong()));
     }
 
     @GetMapping("/checksum/{sub}")
     @ApiOperation(value = "查询lib所有依赖的checksum")
-    public Tip libChecksum(@PathVariable("sub")String subDir, @RequestParam("jar") String jarFileName) {
+    public Tip libChecksum(@PathVariable("sub")String subDir, @RequestParam("jar") String jarFileName) throws IOException  {
         String rootPath = jarDeployProperties.getRootPath();
 
         File jarFile = new File(rootPath + File.separator + subDir + File.separator + jarFileName);
@@ -270,23 +271,7 @@ public class JarDeployEndpoint {
             return SuccessTip.create(libDependencies);
         }
 
-        // get the file checksum, if no .jar checksum array
-        try{
-        InputStream fis = new FileInputStream(jarFile);
-        CheckedInputStream cs =
-                new CheckedInputStream(fis, new Adler32());
-        ZipInputStream zis =
-                new ZipInputStream(new BufferedInputStream(cs));
-
-            ZipEntry firstEntry = zis.getNextEntry();
-            long checkout = firstEntry.getCrc();
-            String name = firstEntry.getName();
-            "".equals(name);
-
-        }catch (IOException e){
-
-        }
-            return SuccessTip.create(new ArrayList<ChecksumModel>());
+        return SuccessTip.create(Map.entry("checksum", Files.hash(jarFile, Hashing.crc32()).padToLong()));
     }
 
     @GetMapping("/checksum/mismatch")
