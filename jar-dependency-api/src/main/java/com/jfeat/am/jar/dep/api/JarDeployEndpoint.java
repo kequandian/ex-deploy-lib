@@ -198,7 +198,9 @@ public class JarDeployEndpoint {
             List<String> libDependencies = DependencyUtils.getDependenciesByJar(jarFile);
             if(libDependencies!=null && libDependencies.size()>0) {
                 var query= StringUtils.isEmpty(pattern) ? libDependencies
-                        : libDependencies.stream().filter(u->u.contains(pattern)).collect(Collectors.toList());
+                        : libDependencies.stream()
+                        .filter(u->u.contains(pattern))
+                        .collect(Collectors.toList());
                 return SuccessTip.create(query);
             }
             return SuccessTip.create(new ArrayList<String>());
@@ -239,7 +241,8 @@ public class JarDeployEndpoint {
 
     @GetMapping("/checksum")
     @ApiOperation(value = "查询lib所有依赖的checksum")
-    public Tip rootChecksum(@RequestParam("jar") String jarFileName) throws IOException {
+    public Tip rootChecksum(@RequestParam("jar") String jarFileName,
+                            @RequestParam(name="pattern", required = false) String pattern) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
 
         File jarFile = new File(rootPath + File.separator + jarFileName);
@@ -249,6 +252,12 @@ public class JarDeployEndpoint {
 
         List<ChecksumModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
         if(libDependencies!=null && libDependencies.size()>0) {
+            if(!StringUtils.isEmpty(pattern)){
+                libDependencies = libDependencies.stream()
+                        .filter(x->x.getDependency().contains(pattern))
+                        .collect(Collectors.toList());
+            }
+
             return SuccessTip.create(libDependencies);
         }
 

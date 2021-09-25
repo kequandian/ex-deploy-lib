@@ -22,17 +22,17 @@ GET {{endpoint}}/api/jar/dep/jars/lib
 Content-Type: application/json
 
 
+### deploy
 
 ### 自动查找standalone部署
 POST {{endpoint}}/api/jar/dep/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
 Content-Type: application/json
 
 
-### 对比两个jar注入 (TBD)
+### 对比两个jar注入
 //POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
 POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
 Content-Type: application/json
-
 
 
 ### 注入
