@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.*;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -319,6 +320,11 @@ public Tip rootChecksum(@RequestParam(value = "dir", required = false)String dir
 
         // decompile
         final StringBuilder decompiles = new StringBuilder();
+        OutputSinkFactory.Sink println = line -> {
+            decompiles.append(line);
+            System.out.println(line);
+        };
+
         OutputSinkFactory mySink = new OutputSinkFactory() {
             @Override
             public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> collection) {
@@ -328,7 +334,7 @@ public Tip rootChecksum(@RequestParam(value = "dir", required = false)String dir
 
             @Override
             public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
-                return sinkType == SinkType.JAVA ? line->decompiles.append(line) : ignore -> {};
+                return sinkType == SinkType.JAVA ? println : ignore -> {};
             }
         };
 
@@ -336,15 +342,13 @@ public Tip rootChecksum(@RequestParam(value = "dir", required = false)String dir
         //CfrDriver cfrDriver = (new CfrDriver.Builder()).build();
         cfrDriver.analyse(files);
 
-        if(empty){
+        if(!(empty==null || !empty)){
             files.stream().forEach(
                     filePath->org.codehaus.plexus.util.FileUtils.fileDelete(filePath)
             );
         }
-
         return SuccessTip.create(decompiles);
     }
-
 
 
     @PostMapping("/deploy")

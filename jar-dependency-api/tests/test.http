@@ -67,17 +67,15 @@ Content-Type: application/json
 GET {{endpoint}}/api/jar/dep/decompile
 ?dir=lib/classes
 &pattern=PatchFixesHider
-Content-Type: application/json
 
 ### decompile from jar
+// empty:  remove the file after decompile when jar is provided
 GET {{endpoint}}/api/jar/dep/decompile
 ?dir=lib
 &jar=lombok-1.18.8.jar
+&empty=true
 &pattern=Builder
 &target=classes
-&empty=true
-Content-Type: application/json
-
 
 
 ### deploy
