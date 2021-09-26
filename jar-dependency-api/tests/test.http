@@ -21,19 +21,15 @@ Content-Type: application/json
 GET {{endpoint}}/api/jar/dep/jars/lib
 Content-Type: application/json
 
-### search - 可选项
-GET {{endpoint}}/api/jar/dep
-?jar=jar-dependency-api-1.0.0-standalone.jar
-&pattern=
-Content-Type: application/json
 ### 查询指定目录lib下的jar依赖
-GET {{endpoint}}/api/jar/dep/lib
+GET {{endpoint}}/api/jar/dep
 ?jar=jar-dependency-api-1.0.0.jar
+&dir=lib
 &pattern=
 Content-Type: application/json
 
 ### 从JAR解压文件
-POST {{endpoint}}/api/jar/dep/detach
+POST {{endpoint}}/api/jar/dep/extract
 Content-Type: application/json
 
 {
@@ -43,9 +39,43 @@ Content-Type: application/json
 }
 
 ### 查询指定目录lib下的jar的所有文件
-GET {{endpoint}}/api/jar/dep/lib
+GET {{endpoint}}/api/jar/dep/list
 ?jar=lombok-1.18.8.jar
-&pattern=
+&dir=lib
+&pattern=PatchFixesHider$ExtensionMethod.class
+Content-Type: application/json
+
+### extra file from archiva
+POST {{endpoint}}/api/jar/dep/extract
+Content-Type: application/json
+
+{
+    "dir": "lib",
+    "jar": "lombok-1.18.8.jar",
+    "pattern": "PatchFixesHider$ExtensionMethod.class",
+    "target": "classes"
+}
+
+
+### decompile the javaclass
+GET {{endpoint}}/api/jar/dep/decompile
+?javaclass=classes/PatchFixesHider$ExtensionMethod.class
+&dir=lib
+Content-Type: application/json
+
+### decompile from dir
+GET {{endpoint}}/api/jar/dep/decompile
+?dir=lib/classes
+&pattern=PatchFixesHider
+Content-Type: application/json
+
+### decompile from jar
+GET {{endpoint}}/api/jar/dep/decompile
+?dir=lib
+&jar=lombok-1.18.8.jar
+&pattern=Builder
+&target=classes
+&empty=true
 Content-Type: application/json
 
 

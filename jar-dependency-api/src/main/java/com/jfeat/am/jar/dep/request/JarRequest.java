@@ -1,6 +1,10 @@
 package com.jfeat.am.jar.dep.request;
 
 public class JarRequest {
+    /**
+     * 子目录
+     */
+    private String dir;
     private String jar;
     private String pattern;
     private String target;
@@ -38,5 +42,13 @@ public class JarRequest {
 
     public void setJavaclass(String javaclass) {
         this.javaclass = javaclass;
+    }
+
+    public String getDir() {
+        return dir;
+    }
+
+    public void setDir(String dir) {
+        this.dir = dir;
     }
 }

@@ -25,10 +25,105 @@ public class ZipFileUtils {
             System.out.println(x.toString());
         });
     }
+
+    public static List<String> listFilesFromArchive(File zipFile, String pattern) throws IOException{
+        try (
+                InputStream zipStream = new FileInputStream(zipFile);
+                // Creating input stream that also maintains the checksum of
+                // the data which later can be used to validate data
+                // integrity.
+                CheckedInputStream cs =
+                        new CheckedInputStream(zipStream, new Adler32());
+                ZipInputStream zis =
+                        new ZipInputStream(new BufferedInputStream(cs))) {
+
+            // within try
+            ZipEntry entry = null;
+            List<String> list = new ArrayList<>();
+
+            while ((entry = zis.getNextEntry()) != null) {
+                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                    long size = entry.getCrc();
+
+                    if (size > 0) {
+                        list.add(entry.getName());
+                    }
+                }
+            }
+            return list;
+        }
+    }
+
+    /**
+     * 在jar文件中解压文件
+     * @param zipFile
+     * @param pattern 符合条件的搜索 （是否包含内容）
+     * @param target  解压到目标目录
+     * @return
+     * @throws IOException
+     */
+    public static List<String> unzipFilesFromArchiva(File zipFile, String pattern, String target) throws IOException {
+        try (
+                InputStream zipStream = new FileInputStream(zipFile);
+                // Creating input stream that also maintains the checksum of
+                // the data which later can be used to validate data
+                // integrity.
+                CheckedInputStream cs =
+                        new CheckedInputStream(zipStream, new Adler32());
+                ZipInputStream zis =
+                        new ZipInputStream(new BufferedInputStream(cs))) {
+
+            // within try
+            ZipEntry entry = null;
+            List<String> files = new ArrayList<>();
+
+            // Read each entry from the ZipInputStream until no more entry
+            // found indicated by a null return value of the getNextEntry()
+            // method.
+            while ((entry = zis.getNextEntry()) != null) {
+                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                    long size = entry.getCrc();
+                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, FileUtils.filename(entry.getName()))) : entry.getName();
+
+                    if (size > 0) {
+                        String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
+                        String entryFullName = String.join(File.separator,dirname,
+                                ( StringUtils.isNotBlank(target)? filename: entry.getName()) );
+                        FileUtils.mkdir(FileUtils.dirname(entryFullName));
+
+                        byte[] buffer = new byte[1048];
+                        try (FileOutputStream fos =
+                                     new FileOutputStream(entryFullName);
+                             BufferedOutputStream bos =
+                                     new BufferedOutputStream(fos, buffer.length)) {
+
+                            while ((size = zis.read(buffer, 0, buffer.length)) != -1) {
+                                bos.write(buffer, 0, (int) size);
+                            }
+                            bos.flush();
+                        }
+                    }
+                    files.add(filename);
+                }
+            }
+
+            // Print out the checksum value
+            return files;
+        }
+    }
+
     public static List<JarModel> UnzipWithChecksum(File zipFile) throws IOException {
         return UnzipWithChecksum(zipFile, "", "");
     }
 
+    /**
+     * 在zipFile中查找文件 pattern
+     * @param zipFile
+     * @param pattern 符合条件的搜索 （是否包含内容）
+     * @param target  解压到目标目录
+     * @return
+     * @throws IOException
+     */
     public static List<JarModel> UnzipWithChecksum(File zipFile, String pattern, String target) throws IOException {
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
