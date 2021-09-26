@@ -1,6 +1,24 @@
 ### checksum
 @endpoint=http://localhost:8080
 
+### 检查lib的不匹配项
+### majar=true 跳过版本号的比较
+GET {{endpoint}}/api/jar/dep/mismatch
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+//&major=true
+&major=false
+Content-Type: application/json
+
+
+### 返回两个JAR的匹配项
+GET {{endpoint}}/api/jar/dep/match
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+&major=true
+Content-Type: application/json
+
+
 ### 查询jar依赖+checksum
 GET {{endpoint}}/api/jar/dep/checksum
 ?jar=jar-dependency-api-1.0.0-standalone.jar

@@ -1,7 +1,5 @@
 package com.jfeat.am.jar.dep.api;
 
-import com.alibaba.fastjson.JSONObject;
-import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
@@ -13,7 +11,7 @@ import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.ZipFileUtils;
-import com.jfeat.jar.dependency.model.ChecksumModel;
+import com.jfeat.jar.dependency.model.JarModel;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
@@ -24,7 +22,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.util.Assert;
-import org.springframework.util.DigestUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,10 +32,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.zip.Adler32;
-import java.util.zip.CheckedInputStream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
 
 /**
  * 依赖处理接口
@@ -250,11 +243,11 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
         }
 
-        List<ChecksumModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
+        List<JarModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
         if(libDependencies!=null && libDependencies.size()>0) {
             if(!StringUtils.isEmpty(pattern)){
                 libDependencies = libDependencies.stream()
-                        .filter(x->x.getDependency().contains(pattern))
+                        .filter(x->x.getJar().contains(pattern))
                         .collect(Collectors.toList());
             }
 
@@ -275,7 +268,7 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
         }
 
-        List<ChecksumModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
+        List<JarModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
         if(libDependencies!=null && libDependencies.size()>0) {
             return SuccessTip.create(libDependencies);
         }
@@ -303,8 +296,8 @@ public class JarDeployEndpoint {
         }
 
         // get mismatch
-        List<ChecksumModel> baseJarChecksum = DependencyUtils.getChecksumsByJar(rootJarFile);
-        List<ChecksumModel> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
+        List<JarModel> baseJarChecksum = DependencyUtils.getChecksumsByJar(rootJarFile);
+        List<JarModel> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
 
         return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
     }
@@ -314,17 +307,12 @@ public class JarDeployEndpoint {
     /// deploy
     @PostMapping("/detach")
     @ApiOperation(value = "从.jar中解压匹配文件至指定目录")
-    public Tip downloadJarFile(@RequestBody JarRequest request) {
+    public Tip downloadJarFile(@RequestBody JarRequest request) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
         File rootJarFile = new File(rootPath + File.separator + request.getJar());
 
-        long checksum = 0;
-        try {
-            checksum += ZipFileUtils.UnzipWithChecksum(rootJarFile, request.getPattern());
-        }catch (IOException e){
-            throw new BusinessException(BusinessCode.GeneralIOError);
-        }
-        return SuccessTip.create(checksum);
+        var checksums = ZipFileUtils.UnzipWithChecksum(rootJarFile, request.getPattern(), request.getTarget());
+        return SuccessTip.create(checksums);
     }
 
     @PostMapping("/decompile")

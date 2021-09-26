@@ -21,6 +21,34 @@ Content-Type: application/json
 GET {{endpoint}}/api/jar/dep/jars/lib
 Content-Type: application/json
 
+### search - 可选项
+GET {{endpoint}}/api/jar/dep
+?jar=jar-dependency-api-1.0.0-standalone.jar
+&pattern=
+Content-Type: application/json
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/dep/lib
+?jar=jar-dependency-api-1.0.0.jar
+&pattern=
+Content-Type: application/json
+
+### 从JAR解压文件
+POST {{endpoint}}/api/jar/dep/detach
+Content-Type: application/json
+
+{
+    "jar": "jar-dependency-api-1.0.0-standalone.jar",
+    "pattern": "lombok",
+    "target": "lib"
+}
+
+### 查询指定目录lib下的jar的所有文件
+GET {{endpoint}}/api/jar/dep/lib
+?jar=lombok-1.18.8.jar
+&pattern=
+Content-Type: application/json
+
+
 
 ### deploy
 

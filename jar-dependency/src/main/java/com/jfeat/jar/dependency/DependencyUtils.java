@@ -1,21 +1,16 @@
 package com.jfeat.jar.dependency;
 
-import com.alibaba.fastjson.JSONObject;
-import com.jfeat.jar.dependency.model.ChecksumModel;
+import com.jfeat.jar.dependency.model.JarModel;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.tuple.Pair;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
-import javax.naming.CompositeName;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.PortUnreachableException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -109,22 +104,22 @@ public class DependencyUtils {
      * @param jarFile 目标JAR包
      * @return java.util.List<java.lang.String>
      */
-    public static List<ChecksumModel> getChecksumsByJar(File jarFile) {
-        List<ChecksumModel> dependencies = new ArrayList<>();
+    public static List<JarModel> getChecksumsByJar(File jarFile) {
+        List<JarModel> dependencies = new ArrayList<>();
         // 不解压读取压缩包中的文件内容
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(jarFile))) {
             ZipEntry zipEntry;
-            Set<ChecksumModel> names = new HashSet<>();
+            Set<JarModel> names = new HashSet<>();
 
             // 循环遍历压缩包内文件对象
             while ((zipEntry = zis.getNextEntry()) != null) {
-                ChecksumModel model = new ChecksumModel();
-                model.setDependency(zipEntry.getName().replace(FileUtils.LIB_JAR_DIR,""));
+                JarModel model = new JarModel();
+                model.setJar(zipEntry.getName().replace(FileUtils.LIB_JAR_DIR,""));
                 model.setChecksum(zipEntry.getCrc());
                 names.add(model);
             }
             names.stream()
-                    .filter(s -> s.getDependency().endsWith(FileUtils.JAR_SUFFIX))
+                    .filter(s -> s.getJar().endsWith(FileUtils.JAR_SUFFIX))
                     .collect(Collectors.toCollection(() -> dependencies));
             return dependencies;
 
@@ -188,10 +183,10 @@ public class DependencyUtils {
         return target.stream().filter(not(origin::contains)).sorted().collect(Collectors.toList());
     }
 
-    public static List<ChecksumModel> getDifferentChecksums(List<ChecksumModel> origin, List<ChecksumModel> target) {
+    public static List<JarModel> getDifferentChecksums(List<JarModel> origin, List<JarModel> target) {
         return target.stream()
                 .filter(u-> {
-                    for(ChecksumModel checksum : origin){
+                    for(JarModel checksum : origin){
                         return checksum.getChecksum() != u.getChecksum();
                     }
                     return false;

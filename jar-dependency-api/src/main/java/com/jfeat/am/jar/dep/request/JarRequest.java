@@ -5,8 +5,8 @@ public class JarRequest {
     private String pattern;
     private String target;
 
-
     private String javaclass;
+
 
     public String getTarget() {
         return target;

@@ -1,13 +1,16 @@
 package com.jfeat.jar.dependency;
 
+import com.jfeat.jar.dependency.model.JarModel;
 import org.apache.commons.lang3.StringUtils;
+import org.codehaus.plexus.util.FileUtils;
 
-import javax.swing.plaf.PanelUI;
 import java.io.*;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.zip.*;
 
@@ -16,38 +19,51 @@ public class ZipFileUtils {
     public static void main(String[] args) throws Exception {
         String lib = "dependency-cli/lib/test.jar";
         File libFile = new File(lib);
-        String libPath = libFile.getAbsolutePath();
 
-        long checksum = UnzipWithChecksum(libPath);
-        System.out.println(checksum);
+        List<JarModel> checksums = UnzipWithChecksum(libFile);
+        checksums.stream().forEach(x -> {
+            System.out.println(x.toString());
+        });
+    }
+    public static List<JarModel> UnzipWithChecksum(File zipFile) throws IOException {
+        return UnzipWithChecksum(zipFile, "", "");
     }
 
-    public static long UnzipWithChecksum(InputStream zipStream, String pattern) throws IOException {
+    public static List<JarModel> UnzipWithChecksum(File zipFile, String pattern, String target) throws IOException {
         try (
-            // Creating input stream that also maintains the checksum of
-            // the data which later can be used to validate data
-            // integrity.
-            CheckedInputStream cs =
-                    new CheckedInputStream(zipStream, new Adler32());
-            ZipInputStream zis =
-                    new ZipInputStream(new BufferedInputStream(cs))) {
+                InputStream zipStream = new FileInputStream(zipFile);
+                // Creating input stream that also maintains the checksum of
+                // the data which later can be used to validate data
+                // integrity.
+                CheckedInputStream cs =
+                        new CheckedInputStream(zipStream, new Adler32());
+                ZipInputStream zis =
+                        new ZipInputStream(new BufferedInputStream(cs))) {
 
-            ZipEntry entry=null;
-            long checksum = 0;
+            // within try
+            ZipEntry entry = null;
+            List<JarModel> checksums = new ArrayList<>();
 
             // Read each entry from the ZipInputStream until no more entry
             // found indicated by a null return value of the getNextEntry()
             // method.
             while ((entry = zis.getNextEntry()) != null) {
-                if (entry.getName().matches(pattern)) {
+                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                    JarModel jarModel = new JarModel();
                     long size = entry.getCrc();
-                    //size = entry.getCrc();
-                    checksum += size;
-                    if (size > 0) {
-                        byte[] buffer = new byte[1048];
+                    jarModel.setChecksum(size);
+                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, FileUtils.filename(entry.getName()))) : entry.getName();
+                    jarModel.setJar(filename);
 
+                    if (size > 0) {
+                        String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
+                        String entryFullName = String.join(File.separator,dirname,
+                                ( StringUtils.isNotBlank(target)? filename: entry.getName()) );
+                        FileUtils.mkdir(FileUtils.dirname(entryFullName));
+
+                        byte[] buffer = new byte[1048];
                         try (FileOutputStream fos =
-                                     new FileOutputStream(entry.getName());
+                                     new FileOutputStream(entryFullName);
                              BufferedOutputStream bos =
                                      new BufferedOutputStream(fos, buffer.length)) {
 
@@ -57,40 +73,15 @@ public class ZipFileUtils {
                             bos.flush();
                         }
                     }
+                    checksums.add(jarModel);
                 }
             }
+
             // Print out the checksum value
-            return checksum;
+            return checksums;
         }
     }
 
-    public static long UnzipWithChecksum(InputStream zipStream) throws IOException {
-        return UnzipWithChecksum(zipStream, "");
-    }
-
-    public static long UnzipWithChecksum(File zipFile) throws IOException {
-        try (InputStream fis = new FileInputStream(zipFile)) {
-            return UnzipWithChecksum(fis);
-        }
-    }
-
-    public static long UnzipWithChecksum(File zipFile, String pattern) throws IOException {
-        try (InputStream fis = new FileInputStream(zipFile)) {
-            return UnzipWithChecksum(fis, pattern);
-        }
-    }
-
-    public static long UnzipWithChecksum(String zipName) throws IOException {
-        try (FileInputStream fis = new FileInputStream(zipName)) {
-            return UnzipWithChecksum(fis);
-        }
-    }
-
-    public static long UnzipWithChecksum(String zipName, String pattern) throws IOException {
-        try (FileInputStream fis = new FileInputStream(zipName)) {
-            return UnzipWithChecksum(fis, pattern);
-        }
-    }
 
     //https://www.cnblogs.com/softidea/p/4272451.html
     //http://stackoverflow.com/questions/3048669/how-can-i-add-entries-to-an-existing-zip-file-in-java?lq=1
