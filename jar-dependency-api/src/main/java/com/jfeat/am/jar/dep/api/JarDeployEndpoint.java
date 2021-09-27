@@ -1,7 +1,6 @@
 package com.jfeat.am.jar.dep.api;
 
 import com.google.common.hash.HashCode;
-import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.google.common.io.Files;
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;

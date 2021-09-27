@@ -7,14 +7,13 @@ import java.util.Enumeration;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
 import java.util.zip.CRC32;
-import java.util.zip.Deflater;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-//https://www.developer.com/guides/accessing-zips-and-jars-using-java-part-2/
+// https://www.developer.com/guides/accessing-zips-and-jars-using-java-part-2/
 // http://thornton.rosesquared.org/articles/ZipJar/part2.html
+
+// http://www.java2s.com/example/java-api/java/util/zip/crc32/crc32-0-18.html
 
 public class JarUpdate {
 
