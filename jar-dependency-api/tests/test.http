@@ -68,7 +68,10 @@ GET {{endpoint}}/api/jar/dep/decompile
 ?dir=lib/classes
 &pattern=PatchFixesHider
 
-### decompile from jar
+### decompile java class from jar directly
+// dir: path to locate the jar
+// pattern: contains string to match the file in jar 
+// target: the target path to save the ext
 // empty:  remove the file after decompile when jar is provided
 GET {{endpoint}}/api/jar/dep/decompile
 ?dir=lib
@@ -77,6 +80,22 @@ GET {{endpoint}}/api/jar/dep/decompile
 &pattern=Builder
 &target=classes
 
+
+### deploy javaclass
+POST {{endpoint}}/api/jar/dep/javaclass/deploy
+Content-Type: application/json
+
+{
+    "dir": "lib",
+    "jar": "lombok-1.18.8.jar",
+    "javaclass": "classes/PatchFixesHider$ExtensionMethod.class"
+}
+
+### 查询指定目录lib下的jar的所有文件
+GET {{endpoint}}/api/jar/dep/list
+?jar=lombok-1.18.8.jar
+&dir=lib
+//&pattern=PatchFixesHider$ExtensionMethod.class
 
 ### deploy
 

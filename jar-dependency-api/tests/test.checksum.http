@@ -20,14 +20,17 @@ Content-Type: application/json
 
 
 ### 查询jar依赖+checksum
+// type: default: md5l
+//   supported: adler32,crc32,crc32c,md5,sha1,sha256,sha512
+//   endsWith "l", means padToLong
 GET {{endpoint}}/api/jar/dep/checksum
 ?jar=jar-dependency-api-1.0.0-standalone.jar
 &pattern=jar-dependency
-Content-Type: application/json
 ### 查询指定目录lib下的jar依赖
 GET {{endpoint}}/api/jar/dep/checksum
 ?jar=jar-dependency-api-1.0.0.jar
-Content-Type: application/json
+&dir=lib
+&type=md5l
 
 
 ### 依据checksum检查两个jar的更新依赖

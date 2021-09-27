@@ -2,18 +2,29 @@ package com.jfeat.am.jar.dep.request;
 
 public class JarRequest {
     /**
-     * 子目录
+     * the dir jar locates
      */
     private String dir;
+    /**
+     * JAR
+     */
     private String jar;
+    /**
+     * the content which zip entry name contains
+     */
     private String pattern;
+    /**
+     * the target path to extra to
+     */
     private String target;
-
+    /**
+     * the javaclass to list, extra or deploy
+     */
     private String javaclass;
 
 
     public String getTarget() {
-        return target;
+        return target==null?"":target;
     }
 
     public void setTarget(String target) {
@@ -45,7 +56,7 @@ public class JarRequest {
     }
 
     public String getDir() {
-        return dir;
+        return dir==null?"":dir;
     }
 
     public void setDir(String dir) {

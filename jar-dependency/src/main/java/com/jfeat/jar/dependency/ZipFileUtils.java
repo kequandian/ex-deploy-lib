@@ -116,6 +116,8 @@ public class ZipFileUtils {
         return UnzipWithChecksum(zipFile, "", "");
     }
 
+
+
     /**
      * 在zipFile中查找文件 pattern
      * @param zipFile
@@ -147,7 +149,8 @@ public class ZipFileUtils {
                     JarModel jarModel = new JarModel();
                     long size = entry.getCrc();
                     jarModel.setChecksum(size);
-                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, FileUtils.filename(entry.getName()))) : entry.getName();
+                    String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
+                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName();
                     jarModel.setJar(filename);
 
                     if (size > 0) {
@@ -196,7 +199,7 @@ public class ZipFileUtils {
         }
     }
 
-    public void addFileToZip(File fileToAdd, File zipFile) {
+    public static String addFileToZip(File zipFile, File addFile) {
         ZipOutputStream zos = null;
         FileInputStream fis = null;
         ZipEntry ze = null;
@@ -208,13 +211,16 @@ public class ZipFileUtils {
         } catch (FileNotFoundException e) {
         }
 
-        ze = new ZipEntry("org" + File.separator + "cfg" +
-                File.separator + "resource" + File.separator + fileToAdd.getName());
+        String entryPath = addFile.getAbsolutePath()
+                .substring(FileUtils.dirname(zipFile.getAbsolutePath()).length()+1)
+                .replace(File.separator, "/");
+
+        ze = new ZipEntry(entryPath);
         try {
             zos.putNextEntry(ze);
 
-            fis = new FileInputStream(fileToAdd);
-            buffer = new byte[(int) fileToAdd.length()];
+            fis = new FileInputStream(addFile);
+            buffer = new byte[(int) addFile.length()];
 
             while ((len = fis.read(buffer)) > 0) {
                 zos.write(buffer, 0, len);
@@ -227,36 +233,8 @@ public class ZipFileUtils {
             fis.close();
         } catch (IOException e) {
         }
+        return entryPath;
     }
-
-    public static void addFileToZipFS(String[] args) throws Exception {
-        Map<String, String> env = new HashMap<>();
-        env.put("create", "true");
-        URI uri = URI.create("jar:file:/codeSamples/zipfs/zipfstest.zip");
-
-        try (FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
-            Path externalTxtFile = Paths.get("/codeSamples/zipfs/SomeTextFile.txt");
-            Path pathInZipfile = zipfs.getPath("/SomeTextFile.txt");
-
-            // copy a file into the zip file
-            Files.copy(externalTxtFile, pathInZipfile,
-                    StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    static void checkManifest(String jarFileName, String mainClass) throws Exception {
-        File f = new File(jarFileName);
-        ZipFile zf = new ZipFile(f);
-        ZipEntry ze = zf.getEntry("META-INF/MANIFEST.MF");
-        BufferedReader r = new BufferedReader(
-                new InputStreamReader(zf.getInputStream(ze)));
-        String line = r.readLine();
-        while (line != null && !(line.startsWith("Main-Class:"))) {
-            line = r.readLine();
-        }
-        zf.close();
-    }
-
 
     // https://stackoverflow.com/questions/2223434/appending-files-to-a-zip-file-with-java
     public static void addFilesToZip(File source, File[] files) {
@@ -294,4 +272,39 @@ public class ZipFileUtils {
             e.printStackTrace();
         }
     }
+
+
+    /**
+     * sample
+     * @param args
+     * @throws Exception
+     */
+    public static void addFileToZipFS(String[] args) throws Exception {
+        Map<String, String> env = new HashMap<>();
+        env.put("create", "true");
+        URI uri = URI.create("jar:file:/codeSamples/zipfs/zipfstest.zip");
+
+        try (FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
+            Path externalTxtFile = Paths.get("/codeSamples/zipfs/SomeTextFile.txt");
+            Path pathInZipfile = zipfs.getPath("/SomeTextFile.txt");
+
+            // copy a file into the zip file
+            Files.copy(externalTxtFile, pathInZipfile,
+                    StandardCopyOption.REPLACE_EXISTING);
+        }
+    }
+
+    static void checkManifest(String jarFileName, String mainClass) throws Exception {
+        File f = new File(jarFileName);
+        ZipFile zf = new ZipFile(f);
+        ZipEntry ze = zf.getEntry("META-INF/MANIFEST.MF");
+        BufferedReader r = new BufferedReader(
+                new InputStreamReader(zf.getInputStream(ze)));
+        String line = r.readLine();
+        while (line != null && !(line.startsWith("Main-Class:"))) {
+            line = r.readLine();
+        }
+        zf.close();
+    }
+
 }

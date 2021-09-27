@@ -4,7 +4,9 @@ import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.jar.dependency.DependencyUtils;
+import com.jfeat.jar.dependency.ZipFileUtils;
 import org.apache.commons.io.FileUtils;
+import org.springframework.util.Assert;
 
 import java.io.File;
 import java.io.IOException;
@@ -82,27 +84,36 @@ public class DepUtils {
 
 
     /**
-     * pre deploy, convert jar file to BOOT-INF/lib
+     * pre deploy, convert deploying file to the same path on jar
      * @param jarFile
      * @return
      */
-    public static File convertToLibJar(File jarFile, String rootPath) {
-        final String LIB = "BOOT-INF/lib";
-        File libFile = new File(rootPath + File.separator + LIB + File.separator + jarFile.getName());
-        if(libFile.exists()) {
-            try {
-                FileUtils.forceDelete(libFile);
-                FileUtils.moveFile(jarFile, libFile);
-            } catch (IOException e) {
-                throw new BusinessException(BusinessCode.GeneralIOError, "delete file error: " +e.getMessage());
-            }
-        }else{
-            try {
-                FileUtils.moveFile(jarFile, libFile);
-            } catch (IOException e) {
-                throw new BusinessException(BusinessCode.GeneralIOError, "move file error:"+e.getMessage());
-            }
+    public static File alignJarEntry(File jarFile, File deployingFile) throws IOException {
+        Assert.isTrue(jarFile.exists(), jarFile + " not exists!");
+        Assert.isTrue(deployingFile.exists(), deployingFile + " not exists!");
+
+        // locate file with jar
+        String filename = org.codehaus.plexus.util.FileUtils.filename(deployingFile.getName());
+        var query = ZipFileUtils.listFilesFromArchive(jarFile, filename);
+        Assert.isTrue(query.size()==1, "fail to find deploying file within jar:" + filename);
+
+        // deploy
+        String targetJarDir = org.codehaus.plexus.util.FileUtils.dirname(jarFile.getAbsolutePath());
+        String targetFilename = query.get(0);
+
+        String targetDeploy = String.join(File.separator, targetJarDir, targetFilename);
+        String targetDeployDirname = org.codehaus.plexus.util.FileUtils.dirname(targetDeploy);
+        if(!new File(targetDeployDirname).exists()){
+            org.codehaus.plexus.util.FileUtils.mkdir(targetDeploy);
         }
-        return libFile;
+
+        //move deploying file as target filename
+        var result = new File(targetDeploy);
+        if(result.exists()){
+            FileUtils.forceDelete(result);
+        }
+        FileUtils.moveFile(deployingFile, result);
+
+        return result;
     }
 }
