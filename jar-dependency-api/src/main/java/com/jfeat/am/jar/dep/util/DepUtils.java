@@ -82,6 +82,9 @@ public class DepUtils {
         return DependencyUtils.getSameDependenciesIgnoreVersion(appDependencies,libDependencies);
     }
 
+    private static String getFullPathname(File jarFile){
+        return String.join(File.separator, org.codehaus.plexus.util.FileUtils.dirname(jarFile.getAbsolutePath()), org.codehaus.plexus.util.FileUtils.filename(jarFile.getAbsolutePath()));
+    }
 
     /**
      * pre deploy, convert deploying file to the same path on jar
@@ -96,24 +99,32 @@ public class DepUtils {
         String filename = org.codehaus.plexus.util.FileUtils.filename(deployingFile.getName());
         var query = ZipFileUtils.listFilesFromArchive(jarFile, filename);
         Assert.isTrue(query.size()==1, "fail to find deploying file within jar:" + filename);
+        String targetFilename = query.get(0);
 
         // deploy
         String targetJarDir = org.codehaus.plexus.util.FileUtils.dirname(jarFile.getAbsolutePath());
-        String targetFilename = query.get(0);
+        String targetJarFilename = String.join(File.separator, targetJarDir, targetFilename);
+        // check if is the same file
+        if(getFullPathname(deployingFile).equals(targetJarFilename)){
+            return new File(targetJarFilename);
+        }
 
-        String targetDeploy = String.join(File.separator, targetJarDir, targetFilename);
-        String targetDeployDirname = org.codehaus.plexus.util.FileUtils.dirname(targetDeploy);
-        if(!new File(targetDeployDirname).exists()){
-            org.codehaus.plexus.util.FileUtils.mkdir(targetDeploy);
+        // mkdir
+        {
+            String targetDeployDirname = org.codehaus.plexus.util.FileUtils.dirname(targetJarFilename);
+            if (!new File(targetDeployDirname).exists()) {
+                org.codehaus.plexus.util.FileUtils.mkdir(targetJarFilename);
+            }
         }
 
         //move deploying file as target filename
-        var result = new File(targetDeploy);
-        if(result.exists()){
-            FileUtils.forceDelete(result);
+        var targetJarFile = new File(targetJarFilename);
+        if(targetJarFile.exists()){
+            FileUtils.forceDelete(targetJarFile);
         }
-        FileUtils.moveFile(deployingFile, result);
 
-        return result;
+        FileUtils.copyFile(deployingFile, targetJarFile);
+
+        return targetJarFile;
     }
 }

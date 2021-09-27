@@ -12,6 +12,7 @@ import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
+import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
 import com.jfeat.jar.dependency.model.JarModel;
 import io.swagger.annotations.Api;
@@ -433,7 +434,8 @@ public class JarDeployEndpoint {
             File okClassFile = DepUtils.alignJarEntry(jarFile, classFile);
 
             // update into zip/jar
-            String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
+            //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
+            String result = JarUpdate.addFile(jarFile, okClassFile);
             results.add(result);
         }
 

@@ -26,6 +26,14 @@ public class ZipFileUtils {
         });
     }
 
+    public static String getRelativeFilePath(File baseFile, File file) {
+        String entryPath = org.codehaus.plexus.util.FileUtils.dirname(file.getAbsolutePath())
+                .substring(org.codehaus.plexus.util.FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
+
+        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()))
+                .replace(File.separator, "/");
+    }
+
     public static List<String> listFilesFromArchive(File zipFile, String pattern) throws IOException{
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
@@ -45,7 +53,7 @@ public class ZipFileUtils {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
                     long size = entry.getCrc();
 
-                    if (size > 0) {
+                    if (size >= 0) {
                         list.add(entry.getName());
                     }
                 }
@@ -211,10 +219,7 @@ public class ZipFileUtils {
         } catch (FileNotFoundException e) {
         }
 
-        String entryPath = addFile.getAbsolutePath()
-                .substring(FileUtils.dirname(zipFile.getAbsolutePath()).length()+1)
-                .replace(File.separator, "/");
-
+        String entryPath = getRelativeFilePath(zipFile, addFile);
         ze = new ZipEntry(entryPath);
         try {
             zos.putNextEntry(ze);
@@ -279,6 +284,7 @@ public class ZipFileUtils {
      * @param args
      * @throws Exception
      */
+    //https://docs.oracle.com/javase/7/docs/technotes/guides/io/fsp/zipfilesystemprovider.html
     public static void addFileToZipFS(String[] args) throws Exception {
         Map<String, String> env = new HashMap<>();
         env.put("create", "true");
@@ -306,5 +312,4 @@ public class ZipFileUtils {
         }
         zf.close();
     }
-
 }
