@@ -435,6 +435,7 @@ public class JarDeployEndpoint {
 
             // update into zip/jar
             //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
+            //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
             String result = JarUpdate.addFile(jarFile, okClassFile);
             results.add(result);
         }

@@ -9,19 +9,23 @@ import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
 import java.util.zip.CRC32;
+import java.util.zip.Deflater;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
 //https://www.developer.com/guides/accessing-zips-and-jars-using-java-part-2/
 // http://thornton.rosesquared.org/articles/ZipJar/part2.html
 
 public class JarUpdate {
 
     public static String getRelativeFilePath(File baseFile, File file) {
-        String entryPath = org.codehaus.plexus.util.FileUtils.dirname(file.getAbsolutePath())
-                .substring(org.codehaus.plexus.util.FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
+        String entryPath = FileUtils.dirname(file.getAbsolutePath())
+                .substring(FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
 
-        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()))
+        return String.join(File.separator, entryPath, FileUtils.filename(file.getAbsolutePath()))
                 .replace(File.separator, "/");
     }
+
 
     /**
      * main()
@@ -46,7 +50,7 @@ public class JarUpdate {
             // Create a temp jar file with no manifest. (The manifest will
             // be copied when the entries are copied.)
 
-            Manifest jarManifest = jar.getManifest();
+            // Manifest jarManifest = jar.getManifest();
             JarOutputStream tempJar =
                     new JarOutputStream(new FileOutputStream(tempJarFile));
 
@@ -62,24 +66,29 @@ public class JarUpdate {
 
                 try {
                     // Create a jar entry and add it to the temp jar.
+                    CRC32 crc32 = new CRC32();
+                    while ((bytesRead = fis.read(buffer)) > -1) {
+                        crc32.update(buffer, 0, bytesRead);
+                    }
+                    fis.close();
+
 
                     JarEntry entry = new JarEntry(fileName);
-                    entry.setMethod(ZipEntry.STORED);
+                    entry.setMethod(ZipOutputStream.STORED);
+                    //entry.setLevel(Deflater.NO_COMPRESSION);
+                    entry.setSize(inputFile.length());
+                    entry.setTime(inputFile.lastModified());
+                    entry.setCrc(crc32.getValue());
+
                     tempJar.putNextEntry(entry);
 
-                    // Read the file and write it to the jar.
 
-                    int bytesReadTotal = 0;
+                    // Read the file and write it to the jar.
+                    fis = new FileInputStream(inputFile);
+
                     while ((bytesRead = fis.read(buffer)) != -1) {
                         tempJar.write(buffer, 0, bytesRead);
-                        bytesReadTotal += bytesRead;
                     }
-                    entry.setSize(bytesReadTotal);
-                    entry.setCrc(0);
-                    //CRC32 crc = new CRC32();
-                    //crc.reset();
-                    //crc.update(buffer);
-                    //entry.setCrc(crc.getValue());
 
                     System.out.println(entry.getName() + " added.");
                 }
@@ -141,8 +150,10 @@ public class JarUpdate {
         // temp jar file to the original name.
 
         if (jarUpdated) {
+            String originJarFile = jarFile.getAbsolutePath();
             jarFile.renameTo(new File(jarFile.getAbsolutePath().replace(".jar", ".zip.temp")));
-            tempJarFile.renameTo(jarFile);
+            tempJarFile.renameTo(new File(originJarFile));
+
             System.out.println(jarFile.getName() + " updated.");
         }
 

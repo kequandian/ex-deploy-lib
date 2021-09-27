@@ -53,7 +53,7 @@ public class ZipFileUtils {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
                     long size = entry.getCrc();
 
-                    if (size >= 0) {
+                    if (size > 0) {
                         list.add(entry.getName());
                     }
                 }

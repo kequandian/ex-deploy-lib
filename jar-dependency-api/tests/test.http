@@ -42,7 +42,7 @@ Content-Type: application/json
 GET {{endpoint}}/api/jar/dep/list
 ?jar=lombok-1.18.8.jar
 &dir=lib
-&pattern=PatchFixesHider
+&pattern=PatchFixesHider$ExtensionMethod.class
 Content-Type: application/json
 
 ### extra file from archiva
@@ -96,6 +96,9 @@ GET {{endpoint}}/api/jar/dep/list
 ?jar=lombok-1.18.8.jar
 &dir=lib
 //&pattern=PatchFixesHider$ExtensionMethod.class
+
+
+
 
 ### deploy
 
