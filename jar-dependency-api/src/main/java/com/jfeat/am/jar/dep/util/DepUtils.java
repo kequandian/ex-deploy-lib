@@ -2,10 +2,11 @@ package com.jfeat.am.jar.dep.util;
 
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
-import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.ZipFileUtils;
+import com.jfeat.jar.dependency.model.JarModel;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.Assert;
 
 import java.io.File;
@@ -126,5 +127,28 @@ public class DepUtils {
         FileUtils.copyFile(deployingFile, targetJarFile);
 
         return targetJarFile;
+    }
+
+
+    /**
+     * 
+     * @param rootPath the root path
+     * @param dir  the jar location
+     * @param jar  the jar
+     * @param pattern  filter the file within jar
+     * @param target  extra files to 
+     * @return
+     */
+    public static List<JarModel> extraFilesFromJar(String rootPath, String dir, String jar, String pattern, String target) throws IOException{
+        File rootJarFile = new File(String.join(File.separator, rootPath, dir, jar));
+
+        if(StringUtils.isNotEmpty(target)){
+            String targetPath = String.join(File.separator, rootPath, target);
+            if(!new File(targetPath).exists()){
+                org.codehaus.plexus.util.FileUtils.mkdir(targetPath);
+            }
+        }
+
+        return ZipFileUtils.UnzipWithChecksum(rootJarFile, pattern, target);
     }
 }

@@ -14,6 +14,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.zip.*;
 
+import static com.jfeat.jar.dependency.FileUtils.getRelativeFilePath;
+
 public class ZipFileUtils {
 
     public static void main(String[] args) throws Exception {
@@ -26,13 +28,6 @@ public class ZipFileUtils {
         });
     }
 
-    public static String getRelativeFilePath(File baseFile, File file) {
-        String entryPath = org.codehaus.plexus.util.FileUtils.dirname(file.getAbsolutePath())
-                .substring(org.codehaus.plexus.util.FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
-
-        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()))
-                .replace(File.separator, "/");
-    }
 
     public static List<String> listFilesFromArchive(File zipFile, String pattern) throws IOException{
         try (

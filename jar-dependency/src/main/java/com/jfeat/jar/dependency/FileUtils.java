@@ -145,4 +145,18 @@ public class FileUtils {
         }
         return null;
     }
+
+    /**
+     * 获取 file文件的相对路径
+     * @param baseFile
+     * @param file
+     * @return
+     */
+    public static String getRelativeFilePath(File baseFile, File file) {
+        String entryPath = org.codehaus.plexus.util.FileUtils.dirname(file.getAbsolutePath())
+                .substring(org.codehaus.plexus.util.FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
+
+        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()))
+                .replace(File.separator, "/");
+    }
 }

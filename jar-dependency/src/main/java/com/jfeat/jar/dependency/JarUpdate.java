@@ -3,7 +3,9 @@ package com.jfeat.jar.dependency;
 import org.codehaus.plexus.util.FileUtils;
 
 import java.io.*;
+import java.util.ArrayList;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
@@ -29,20 +31,17 @@ public class JarUpdate {
     /**
      * main()
      */
-    public static String addFile(File jarFile, File inputFile) throws IOException {
+    public static List<String> addFiles(File jarFile, List<File> inputFiles) throws IOException {
+        //Assert.isTrue(inputFiles!=null && inputFiles.size()>0, "input files should not be empty !");
         // Create file descriptors for the jar and a temp jar.
         File tempJarFile = new File(jarFile.getAbsolutePath() + ".tmp");
-
-        // get input fileName
-        String fileName = getRelativeFilePath(jarFile, inputFile);
-
 
         // Open the jar file.
         JarFile jar = new JarFile(jarFile);
         System.out.println(jarFile.getName() + " opened.");
 
         // Initialize a flag that will indicate that the jar was updated.
-
+        List<String> fileNames = new ArrayList<>();
         boolean jarUpdated = false;
 
         try {
@@ -59,40 +58,43 @@ public class JarUpdate {
             int bytesRead;
 
             try {
-                // Open the given file.
+                for(File inputFile : inputFiles) {
+                    // Open the given file.
+                    String fileName = getRelativeFilePath(jarFile, inputFile);
+                    FileInputStream fis = new FileInputStream(inputFile);
 
-                FileInputStream fis = new FileInputStream(inputFile);
+                    fileNames.add(fileName);
 
-                try {
-                    // Create a jar entry and add it to the temp jar.
-                    CRC32 crc32 = new CRC32();
-                    while ((bytesRead = fis.read(buffer)) > -1) {
-                        crc32.update(buffer, 0, bytesRead);
+                    try {
+                        // Create a jar entry and add it to the temp jar.
+                        CRC32 crc32 = new CRC32();
+                        while ((bytesRead = fis.read(buffer)) > -1) {
+                            crc32.update(buffer, 0, bytesRead);
+                        }
+                        fis.close();
+
+
+                        JarEntry entry = new JarEntry(fileName);
+                        entry.setMethod(ZipOutputStream.STORED);
+                        //entry.setLevel(Deflater.NO_COMPRESSION);
+                        entry.setSize(inputFile.length());
+                        entry.setTime(inputFile.lastModified());
+                        entry.setCrc(crc32.getValue());
+
+                        tempJar.putNextEntry(entry);
+
+
+                        // Read the file and write it to the jar.
+                        fis = new FileInputStream(inputFile);
+
+                        while ((bytesRead = fis.read(buffer)) != -1) {
+                            tempJar.write(buffer, 0, bytesRead);
+                        }
+
+                        System.out.println(entry.getName() + " added.");
+                    } finally {
+                        fis.close();
                     }
-                    fis.close();
-
-
-                    JarEntry entry = new JarEntry(fileName);
-                    entry.setMethod(ZipOutputStream.STORED);
-                    //entry.setLevel(Deflater.NO_COMPRESSION);
-                    entry.setSize(inputFile.length());
-                    entry.setTime(inputFile.lastModified());
-                    entry.setCrc(crc32.getValue());
-
-                    tempJar.putNextEntry(entry);
-
-
-                    // Read the file and write it to the jar.
-                    fis = new FileInputStream(inputFile);
-
-                    while ((bytesRead = fis.read(buffer)) != -1) {
-                        tempJar.write(buffer, 0, bytesRead);
-                    }
-
-                    System.out.println(entry.getName() + " added.");
-                }
-                finally {
-                    fis.close();
                 }
 
                 // Loop through the jar entries and add them to the temp jar,
@@ -105,7 +107,9 @@ public class JarUpdate {
 
                     // If the entry has not been added already, add it.
 
-                    if (! entry.getName().equals(fileName)) {
+                    //if (! entry.getName().equals(fileName)) {
+                    if(fileNames.contains(entry.getName())){
+
                         // Get an input stream for the entry.
 
                         InputStream entryStream = jar.getInputStream(entry);
@@ -156,6 +160,6 @@ public class JarUpdate {
             System.out.println(jarFile.getName() + " updated.");
         }
 
-        return fileName;
+        return fileNames;
     }
 }

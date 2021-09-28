@@ -13,7 +13,6 @@ import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
-import com.jfeat.am.jar.dep.request.JarIndexes;
 import com.jfeat.jar.dependency.model.JarModel;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -51,9 +50,10 @@ public class JarDeployEndpoint {
     @Autowired
     private JarDeployProperties jarDeployProperties;
 
-    @PostMapping("/jars/upload/{sub}")
+    @PostMapping("/jars/upload/{dir}")
     @ApiOperation(value = "发送.jar至指定目录")
-    public Tip uploadJarFile(@RequestPart("file") MultipartFile file, @PathVariable(value = "sub", required = false) String subDir) {
+    public Tip uploadJarFile(@RequestPart("file") MultipartFile file,
+                             @PathVariable(value = "dir", required = false) String dir) {
         if (file.isEmpty()) {
             throw new BusinessException(BusinessCode.BadRequest, "file is empty");
         }
@@ -62,14 +62,14 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.BadRequest, "file is empty");
         }
         /// end sanity
-        if(subDir==null) subDir="";
+        if(dir==null) dir="";
 
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
         Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
 
-        File subPathFile = new File(String.join(File.separator, rootPath, subDir));
-        if (!StringUtils.isEmpty(subDir)) {
+        File subPathFile = new File(String.join(File.separator, rootPath, dir));
+        if (!StringUtils.isEmpty(dir)) {
             if (!subPathFile.exists()) {
                 subPathFile.mkdirs();
             }
@@ -326,16 +326,7 @@ public class JarDeployEndpoint {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
 
-        File rootJarFile = new File(String.join(File.separator, rootPath, request.getDir(), request.getJar()));
-
-        if(StringUtils.isNotEmpty(request.getTarget())){
-            String targetPath = String.join(File.separator, rootPath, request.getTarget());
-            if(!new File(targetPath).exists()){
-                org.codehaus.plexus.util.FileUtils.mkdir(targetPath);
-            }
-        }
-
-        var checksums = ZipFileUtils.UnzipWithChecksum(rootJarFile, request.getPattern(), request.getTarget());
+        var checksums =  DepUtils.extraFilesFromJar(rootPath, request.getDir(), request.getJar(), request.getPattern(), request.getTarget());
         return SuccessTip.create(checksums);
     }
 
@@ -446,14 +437,34 @@ public class JarDeployEndpoint {
     public Tip compileJarFile(@RequestBody JarRequest request) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
-
         Assert.isTrue(StringUtils.isNotBlank(request.getJar()), "jar cannot be empty!");
-        String jarPath = String.join(File.separator, rootPath, request.getDir(), request.getJar());
+
+        //the jar may be from another base jar
+        //format: app.jar:jar-dependency-1.0.0.jar
+        // try to handle the complex jar
+        String jar = request.getJar().contains(":") ? request.getJar().substring(request.getJar().indexOf(":")+1) : request.getJar();
+
+        String jarPath = String.join(File.separator, rootPath, request.getDir(), jar);
         File jarFile = new File(jarPath);
-        Assert.isTrue(jarFile.exists(), request.getJar() + " not exist !");
+        Assert.isTrue(jarFile.exists() || request.getJar().contains(":"), jar + " not exist !");
 
-        List<String> results = new ArrayList<>();
+        if(!jarFile.exists() && request.getJar().contains(":") ){
+            // get the base jar
+            String baseJar = request.getJar().substring(0, request.getJar().indexOf(":"));
+            File baseJarFile = new File(String.join(File.separator, rootPath, baseJar));
+            Assert.isTrue(baseJarFile.exists(), baseJar + " not exists ！");
+            // get from base jar
+            List<JarModel> checksums =  DepUtils.extraFilesFromJar(rootPath, "", baseJar, jar, request.getTarget());
+            Assert.isTrue(checksums.size()==1, jar + " must be unique within: " + baseJar);
 
+            jarPath = String.join(File.separator, rootPath, checksums.get(0).getJar());
+            jarFile = new File(jarPath);
+        }
+        
+        List<File> classes = new ArrayList<>();
+
+        // dir/javaclass -> classes/javaname.class
+        // target to .jar
         if(StringUtils.isNotEmpty(request.getJavaclass())){
             // deploy to jar
             String classPath = String.join(File.separator, rootPath, request.getDir(), request.getJavaclass());
@@ -461,15 +472,31 @@ public class JarDeployEndpoint {
             Assert.isTrue(classFile.exists(), classPath + " not exists!");
 
             File okClassFile = DepUtils.alignJarEntry(jarFile, classFile);
+            classes.add(okClassFile);
 
-            // update into zip/jar
-            //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
-            //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
-            String result = JarUpdate.addFile(jarFile, okClassFile);
-            results.add(result);
+        }else if(StringUtils.isNotBlank(request.getPattern())){
+            File dirFile = new File(String.join(File.separator, rootPath, request.getDir()));
+            Assert.isTrue(dirFile.exists(), request.getDir() + " not exists!");
+
+            File[] listOfFiles = dirFile.listFiles();
+            Stream.of(listOfFiles)
+                    .filter(f -> FilenameUtils.getExtension(f.getName()).equals("class"))
+                    .filter(f -> f.getName().contains(request.getPattern()))
+                    .map(
+                        f ->{ 
+                            return new File(String.join(File.separator, rootPath, request.getDir(), f.getName()));
+                        }
+                    )
+                    .forEach(f->{
+                        classes.add(f);
+                    });
         }
 
-        return SuccessTip.create(results);
+        // update into zip/jar
+        //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
+        //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
+         List<String> result = JarUpdate.addFiles(jarFile, classes);
+        return SuccessTip.create(result);
     }
 
 
