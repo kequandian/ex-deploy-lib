@@ -51,11 +51,7 @@ public class ZipFileUtils {
 
             while ((entry = zis.getNextEntry()) != null) {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
-                    long size = entry.getCrc();
-
-                    if (size > 0) {
-                        list.add(entry.getName());
-                    }
+                    list.add(entry.getName());
                 }
             }
             return list;
@@ -161,7 +157,7 @@ public class ZipFileUtils {
                     String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName();
                     jarModel.setJar(filename);
 
-                    if (size > 0) {
+                    //if (size > 0) {
                         String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
                         String entryFullName = String.join(File.separator,dirname,
                                 ( StringUtils.isNotBlank(target)? filename: entry.getName()) );
@@ -178,8 +174,9 @@ public class ZipFileUtils {
                             }
                             bos.flush();
                         }
-                    }
-                    checksums.add(jarModel);
+
+                        checksums.add(jarModel);
+                    //}
                 }
             }
 

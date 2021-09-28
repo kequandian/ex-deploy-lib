@@ -52,7 +52,7 @@ public class JarDeployEndpoint {
 
     @PostMapping("/jars/upload/{sub}")
     @ApiOperation(value = "发送.jar至指定目录")
-    public Tip uploadJarFile(@RequestPart("file") MultipartFile file, @PathVariable("sub") String subDir) {
+    public Tip uploadJarFile(@RequestPart("file") MultipartFile file, @PathVariable(value = "sub", required = false) String subDir) {
         if (file.isEmpty()) {
             throw new BusinessException(BusinessCode.BadRequest, "file is empty");
         }
@@ -61,12 +61,13 @@ public class JarDeployEndpoint {
             throw new BusinessException(BusinessCode.BadRequest, "file is empty");
         }
         /// end sanity
+        if(subDir==null) subDir="";
 
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
         Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
 
-        File subPathFile = new File(rootPath + File.separator + subDir);
+        File subPathFile = new File(String.join(File.separator, rootPath, subDir));
         if (!StringUtils.isEmpty(subDir)) {
             if (!subPathFile.exists()) {
                 subPathFile.mkdirs();
@@ -75,7 +76,7 @@ public class JarDeployEndpoint {
 
         String originalFileName = file.getOriginalFilename();
         try {
-            File target = new File(subPathFile.getAbsolutePath() + File.separator + originalFileName);
+            File target = new File(String.join(File.separator, subPathFile.getAbsolutePath(), originalFileName));
             String path = target.getCanonicalPath();
             boolean readable = target.setReadable(true);
             if (readable) {
@@ -101,18 +102,19 @@ public class JarDeployEndpoint {
 
     @GetMapping("/jars")
     @ApiOperation(value = "获取配置目录下指定目录下的所有jar文件")
-    @ApiImplicitParam(name = "sub", value = "查找子目录")
-    public Tip getJars(@RequestParam(value = "dir", required = false) String dir) {
-
+    @ApiImplicitParam(name = "dir", value = "查找子目录")
+    public Tip getJars(@RequestParam(value = "dir", required = false) String dir,
+                       @RequestParam(value = "all", required = false) Boolean all
+                       ) {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        String Dir = dir==null?"":dir;
+        Boolean All = all==null? false : all;
+
         File rootPathFile = new File(rootPath);
         Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
 
-        File subPathFile = new File(String.join(File.separator, rootPath, dir));
-        logger.info("rootPath= {}", rootPathFile.getAbsolutePath());
-        //if(!subPathFile.exists()){
-        //    throw  new BusinessException(BusinessCode.BadRequest, "目录不存在: " + subDir);
-        //}
+        File subPathFile = new File(String.join(File.separator, rootPath, Dir));
         ArrayList<String> filesArray = new ArrayList<>();
 
         if (!subPathFile.exists()) {
@@ -122,7 +124,11 @@ public class JarDeployEndpoint {
         File[] jarFiles = subPathFile.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File file, String s) {
-                return FilenameUtils.getExtension(s).equals("jar");
+                var ext = FilenameUtils.getExtension(s);
+                if(All){
+                    return true;
+                }
+                return ext.equals("jar") || ext.equals("war");
             }
         });
 
@@ -133,13 +139,17 @@ public class JarDeployEndpoint {
         return SuccessTip.create(filesArray);
     }
 
+
     @GetMapping
     @ApiOperation(value = "查询jar的依赖")
     public Tip queryJarDependencies(@RequestParam("jar") String jarFileName,
                                     @RequestParam(value = "dir", required = false) String dir,
                                     @RequestParam(name = "pattern", required = false) String pattern) {
         String rootPath = jarDeployProperties.getRootPath();
-        File jarFile = new File(rootPath + File.separator + jarFileName);
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        if(dir==null) dir="";
+
+        File jarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         if (!jarFile.exists()) {
             throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
         }
@@ -165,6 +175,8 @@ public class JarDeployEndpoint {
                             @RequestParam(value = "major", required = false) boolean major
     ) {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
         List<String> diffDependencies = DepUtils.getMismatchJars(rootPath, baseJar, jar, major);
         if (diffDependencies != null && diffDependencies.size() > 0) {
             return SuccessTip.create(diffDependencies);
@@ -179,6 +191,8 @@ public class JarDeployEndpoint {
                          @ApiParam(name = "major", value = "仅匹配库名,不匹配版本号")
                          @RequestParam(value = "major", required = false) boolean major) {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
         if (major) {
             return SuccessTip.create(DepUtils.getMatchJars(rootPath, baseJar, jar, true));
         }
@@ -193,7 +207,10 @@ public class JarDeployEndpoint {
                             @RequestParam(value = "type", required = false) String type,
                             @RequestParam(name = "pattern", required = false) String pattern) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        File jarFile = new File(rootPath + File.separator + jarFileName);
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        if(dir==null){ dir=""; }
+
+        File jarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
 
         // if type is not empty, just get the file checksum
         if(StringUtils.isEmpty(type)) {
@@ -216,7 +233,8 @@ public class JarDeployEndpoint {
         if(StringUtils.isNotEmpty(type)) {
             final String[] supportedType  =new String[]{"adler32","crc32","crc32c","md5","sha1","sha256","sha512",
                     "adler32l","crc32l","crc32cl","md5l","sha1l","sha256l","sha512l"};
-            Assert.isTrue(Stream.of(supportedType).collect(Collectors.toList()).contains(type), "supported type: " + String.join(",", supportedType));
+            Assert.isTrue(Stream.of(supportedType).collect(Collectors.toList()).contains(type),
+                    "supported type: " + String.join(",", supportedType));
             switch (type) {
                 case "adler32":
                 case "adler32l":
@@ -260,14 +278,16 @@ public class JarDeployEndpoint {
     @ApiOperation(value = "依据checksum检查两个jar的更新依赖")
     public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
         String rootPath = jarDeployProperties.getRootPath();
-        File rootJarFile = new File(rootPath + File.separator + baseJar);
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
+        File rootJarFile = new File(String.join(File.separator, rootPath, baseJar));
         if (!rootJarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }
         if (!rootJarFile.setReadable(true)) {
             throw new BusinessException(BusinessCode.FileReadingError);
         }
-        File jarFile = new File(rootPath + File.separator + jar);
+        File jarFile = new File(String.join(File.separator, rootPath, jar));
         if (!jarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }
@@ -282,14 +302,16 @@ public class JarDeployEndpoint {
         return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
     }
 
-
     /// deploy
-    @GetMapping("/list")
+    @GetMapping("/inspect")
     @ApiOperation(value = "从.jar中匹配查找文件")
-    public Tip queryJarFile(@RequestParam("dir") String dir,
+    public Tip queryJarFile(@RequestParam(value = "dir", required = false) String dir,
                             @RequestParam("jar") String jarFileName,
                             @RequestParam(name = "pattern", required = false) String pattern) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        if(dir==null) dir="";
+
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
@@ -301,6 +323,8 @@ public class JarDeployEndpoint {
     @ApiOperation(value = "从.jar中解压匹配文件至指定目录")
     public Tip downloadJarFile(@RequestBody JarRequest request) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
         File rootJarFile = new File(String.join(File.separator, rootPath, request.getDir(), request.getJar()));
 
         if(StringUtils.isNotEmpty(request.getTarget())){
@@ -324,22 +348,25 @@ public class JarDeployEndpoint {
                                 @RequestParam(value = "empty", required = false) Boolean empty
     ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
+        final String Dir =  dir==null?"":dir;
 
         List<String> files = null;
 
         // javaclass -> p1
-        File javaclasFile = new File(String.join(File.separator, rootPath, dir, javaclass));
+        File javaclasFile = new File(String.join(File.separator, rootPath, Dir, javaclass));
         if (javaclasFile.exists()) {
             List<String> fileList = Stream.of(new String[]{javaclass}).collect(Collectors.toList());
             files = fileList.stream().map(
-                    f -> String.join(File.separator, rootPath, dir, f)
+                    f -> String.join(File.separator, rootPath, Dir, f)
             ).collect(Collectors.toList());
 
         } else if (org.apache.commons.lang3.StringUtils.isNotBlank(jar)) {
             // jar -> p2
             //Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(pattern), "pattern should be empty when decompile classes from jar !");
 
-            File jarFile = new File(String.join(File.separator, rootPath, dir, jar));
+            File jarFile = new File(String.join(File.separator, rootPath, Dir, jar));
             Assert.isTrue(jarFile.exists(), jar + " not exists!");
             if (org.apache.commons.lang3.StringUtils.isBlank(pattern)) {
                 return SuccessTip.create(ZipFileUtils.listFilesFromArchive(jarFile, pattern));
@@ -349,14 +376,14 @@ public class JarDeployEndpoint {
             files = unzipFiles.stream()
                     .filter(f -> FilenameUtils.getExtension(f).equals("class"))
                     .map(
-                            f -> String.join(File.separator, rootPath, dir, f)
+                            f -> String.join(File.separator, rootPath, Dir, f)
                     )
                     .collect(Collectors.toList());
 
         } else {
             // dir -> p3
 
-            File dirFile = new File(String.join(File.separator, rootPath, dir));
+            File dirFile = new File(String.join(File.separator, rootPath, Dir));
             Assert.isTrue(dirFile.exists(), jar + " not exists!");
 
             File[] listOfFiles = dirFile.listFiles();
@@ -364,7 +391,7 @@ public class JarDeployEndpoint {
                     .filter(f -> FilenameUtils.getExtension(f.getName()).equals("class"))
                     .filter(f -> f.getName().contains(pattern))
                     .map(
-                            f -> String.join(File.separator, rootPath, dir, f.getName())
+                            f -> String.join(File.separator, rootPath, Dir, f.getName())
                     )
                     .collect(Collectors.toList());
         }
@@ -417,6 +444,8 @@ public class JarDeployEndpoint {
     @ApiOperation(value = "仅部署")
     public Tip compileJarFile(@RequestBody JarRequest request) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
         Assert.isTrue(StringUtils.isNotBlank(request.getJar()), "jar cannot be empty!");
         String jarPath = String.join(File.separator, rootPath, request.getDir(), request.getJar());
         File jarFile = new File(jarPath);
@@ -457,14 +486,16 @@ public class JarDeployEndpoint {
         String jar = new String(Base64.getDecoder().decode(jar64));
 
         String rootPath = jarDeployProperties.getRootPath();
-        File rootJarFile = new File(rootPath + File.separator + baseJar);
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
+        File rootJarFile = new File(String.join(File.separator, rootPath, baseJar));
         if (!rootJarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }
         if (!rootJarFile.setReadable(true)) {
             throw new BusinessException(BusinessCode.FileReadingError);
         }
-        File jarFile = new File(rootPath + File.separator + jar);
+        File jarFile = new File(String.join(File.separator, rootPath, jar));
         if (!jarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }

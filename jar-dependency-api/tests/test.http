@@ -15,18 +15,52 @@ Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB--
 
 ### 查询根目录下的JAR
+//all: 是否显示所有文件
 GET {{endpoint}}/api/jar/dep/jars
 Content-Type: application/json
 ### 查询指定目录下的JAR
-GET {{endpoint}}/api/jar/dep/jars/lib
-Content-Type: application/json
+GET {{endpoint}}/api/jar/dep/jars
+?dir=lib
+&all=false
+
+### 检查lib的不匹配项
+### majar=true 跳过版本号的比较
+GET {{endpoint}}/api/jar/dep/mismatch
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+//&major=true
+&major=false
+
+### 返回两个JAR的匹配项
+GET {{endpoint}}/api/jar/dep/match
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+&major=true
+
+### 查询jar依赖+checksum
+// type: default: md5l
+//   supported: adler32,crc32,crc32c,md5,sha1,sha256,sha512
+//   endsWith "l", means padToLong
+GET {{endpoint}}/api/jar/dep/checksum
+?jar=jar-dependency-api-1.0.0-standalone.jar
+&pattern=jar-dependency
+### 查询指定目录lib下的jar依赖
+GET {{endpoint}}/api/jar/dep/checksum
+?jar=jar-dependency-api-1.0.0.jar
+&dir=lib
+&type=md5l
+
+### 依据checksum检查两个jar的更新依赖
+GET {{endpoint}}/api/jar/dep/checksum/mismatch
+?baseJar=jar-dependency-api-1.0.0-standalone.jar
+&jar=jar-dependency-api-1.0.0.jar
+
 
 ### 查询指定目录lib下的jar依赖
 GET {{endpoint}}/api/jar/dep
 ?jar=jar-dependency-api-1.0.0.jar
 &dir=lib
 &pattern=
-Content-Type: application/json
 
 ### 从JAR解压文件
 POST {{endpoint}}/api/jar/dep/extract
@@ -43,7 +77,6 @@ GET {{endpoint}}/api/jar/dep/list
 ?jar=lombok-1.18.8.jar
 &dir=lib
 &pattern=PatchFixesHider$ExtensionMethod.class
-Content-Type: application/json
 
 ### extra file from archiva
 POST {{endpoint}}/api/jar/dep/extract
@@ -61,7 +94,6 @@ Content-Type: application/json
 GET {{endpoint}}/api/jar/dep/decompile
 ?javaclass=classes/PatchFixesHider$ExtensionMethod.class
 &dir=lib
-Content-Type: application/json
 
 ### decompile from dir
 GET {{endpoint}}/api/jar/dep/decompile
@@ -96,8 +128,6 @@ GET {{endpoint}}/api/jar/dep/list
 ?jar=lombok-1.18.8.jar
 &dir=lib
 //&pattern=PatchFixesHider$ExtensionMethod.class
-
-
 
 
 ### deploy
