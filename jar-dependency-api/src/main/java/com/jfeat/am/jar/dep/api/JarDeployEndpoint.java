@@ -13,6 +13,7 @@ import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
+import com.jfeat.am.jar.dep.request.JarIndexes;
 import com.jfeat.jar.dependency.model.JarModel;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
@@ -520,5 +521,65 @@ public class JarDeployEndpoint {
         ZipFileUtils.addFilesToZip(rootJarFile, new File[]{libFile});
 
         return SuccessTip.create(libFile.getAbsolutePath().replace((new File(rootPath).getAbsolutePath() + File.separator), ""));
+    }
+
+
+    /**
+     * 创建索引
+     *
+     */
+    @PostMapping("/indexes")
+    @ApiOperation(value = "为.jar创建索引")
+    public Tip createJarIndexes(@RequestParam(value = "dir", required = false) String dir,
+                                @RequestParam("jar") String jarFileName,
+                                @RequestParam(name = "pattern", required = false) String pattern,
+                                @RequestParam(name = "target", required = false) String target
+                                ) throws IOException {
+        String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        if(dir==null) dir="";
+
+        String targetPath = target;
+        if(StringUtils.isNotBlank(target)){
+            var targetDir = new File(String.join(File.separator, rootPath, target));
+            org.codehaus.plexus.util.FileUtils.mkdir(targetDir.getAbsolutePath());
+            targetPath = targetDir.getAbsolutePath();
+        }
+
+        File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
+        Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
+
+        var list = ZipFileUtils.listFilesFromArchive(rootJarFile, pattern);
+
+        // create indexes files
+        final String finalTargetPath = targetPath;
+        String jarFilename = rootJarFile.getName();
+        list.stream().map(key->{
+            Map.Entry<String,String> entry = Map.entry(key, jarFilename);
+            return entry;
+        }).forEach(entry->{
+            String firstLetter = String.valueOf(entry.getKey().charAt(0));
+            File letterFile = new File(String.join(File.separator, finalTargetPath, firstLetter));
+
+            try {
+                // skip exist ones
+                // read content from file
+                List<String> lines = letterFile.exists() ? FileUtils.readLines(letterFile, "UTF-8") : new ArrayList<>();
+                List<String> contents = lines.stream().map(line->{
+                    return line.split(",")[0];
+                }).collect(Collectors.toList());
+
+                // append to file
+                if(!contents.contains(entry.getKey())) {
+                    BufferedWriter bw = new BufferedWriter(new FileWriter(letterFile, true));
+                    bw.append(String.join(",", entry.getKey(), entry.getValue(), "\n"));
+                    bw.close();
+                }
+            } catch (IOException e) {
+                System.out.println(e.getMessage());
+            }
+        });
+
+        return SuccessTip.create(list);
     }
 }
