@@ -17,10 +17,6 @@ public class JarRequest {
      * the target path to extra to
      */
     private String target;
-    /**
-     * the javaclass to list, extra or deploy
-     */
-    private String javaclass;
 
 
     public String getTarget() {
@@ -45,14 +41,6 @@ public class JarRequest {
 
     public void setJar(String jar) {
         this.jar = jar;
-    }
-
-    public String getJavaclass() {
-        return javaclass;
-    }
-
-    public void setJavaclass(String javaclass) {
-        this.javaclass = javaclass;
     }
 
     public String getDir() {

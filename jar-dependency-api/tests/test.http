@@ -20,8 +20,9 @@ GET {{endpoint}}/api/jar/dep/jars
 Content-Type: application/json
 ### 查询指定目录下的JAR
 GET {{endpoint}}/api/jar/dep/jars
-?dir=lib
-&all=false
+?all=true
+# &dir=lib
+
 
 ### 检查lib的不匹配项
 ### majar=true 跳过版本号的比较
@@ -73,10 +74,10 @@ Content-Type: application/json
 }
 
 ### 查询指定目录lib下的jar的所有文件
-GET {{endpoint}}/api/jar/dep/list
-?jar=lombok-1.18.8.jar
-&dir=lib
-&pattern=PatchFixesHider$ExtensionMethod.class
+GET {{endpoint}}/api/jar/dep/inspect
+?jar=jar-dependency-api-1.0.0.jar
+# &dir=lib
+&pattern=JarDeployEndpoint
 
 ### extra file from archiva
 POST {{endpoint}}/api/jar/dep/extract
@@ -113,24 +114,67 @@ GET {{endpoint}}/api/jar/dep/decompile
 &target=classes
 
 
-### deploy javaclass
-POST {{endpoint}}/api/jar/dep/javaclass/deploy
+### deploy
+// dir: where to locate the class
+// pattern:  pattern class files to deploy
+// target: where to locate the jar to deploy into
+POST {{endpoint}}/api/jar/dep/deploy
 Content-Type: application/json
 
 {
-    "dir": "lib",
-    "jar": "lombok-1.18.8.jar",
-    "javaclass": "classes/PatchFixesHider$ExtensionMethod.class"
+    "dir": "classes",
+    "pattern": "PatchFixesHider$ExtensionMethod.class",
+    "target": "lib",
+    "jar": "lombok-1.18.8.jar"
 }
 
-### 查询指定目录lib下的jar的所有文件
-GET {{endpoint}}/api/jar/dep/list
-?jar=lombok-1.18.8.jar
+
+### create indexes
+GET {{endpoint}}/api/jar/dep/indexes
+?jar=jar-dependency-api-1.0.0.jar
+# &dir=lib
+# &pattern=
+&recreate=true
+&target=indexes
+### depends
+GET {{endpoint}}/api/jar/dep/jars
+?all=true
+# &dir=lib
+
+
+### deploy class file
+POST {{endpoint}}/api/jar/dep/deploy
+Content-Type: application/json
+
+{
+    "dir": "classes",
+    "pattern": "JarDeployEndpoint",
+    "jar": "jar-dependency-api-1.0.0.jar",
+    "target": "lib"
+}
+
+### depends 上传jar文件至lib目录
+POST {{endpoint}}/api/jar/dep/jars/upload/lib
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
+
+------WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: form-data; name="file"
+
+title
+------WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar"
+
+< ./target/jar-deploy-api-1.0.0.jar
+------WebKitFormBoundaryAFRaG58f2nIb0mPB--
+### depends list classes
+GET {{endpoint}}/api/jar/dep/jars
+?all=true
+&dir=classes
+### depends list lib
+GET {{endpoint}}/api/jar/dep/jars
+?all=true
 &dir=lib
-//&pattern=PatchFixesHider$ExtensionMethod.class
 
-
-### deploy
 
 ### 自动查找standalone部署
 POST {{endpoint}}/api/jar/dep/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
@@ -141,7 +185,6 @@ Content-Type: application/json
 //POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
 POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}
 Content-Type: application/json
-
 
 ### 注入
 ### baseJar 不支持[.jar],需转换为BASE64

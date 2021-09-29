@@ -432,7 +432,7 @@ public class JarDeployEndpoint {
     }
 
 
-    @PostMapping("/javaclass/deploy")
+    @PostMapping("/deploy")
     @ApiOperation(value = "仅部署")
     public Tip compileJarFile(@RequestBody JarRequest request) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
@@ -465,16 +465,7 @@ public class JarDeployEndpoint {
 
         // dir/javaclass -> classes/javaname.class
         // target to .jar
-        if(StringUtils.isNotEmpty(request.getJavaclass())){
-            // deploy to jar
-            String classPath = String.join(File.separator, rootPath, request.getDir(), request.getJavaclass());
-            File classFile = new File(classPath);
-            Assert.isTrue(classFile.exists(), classPath + " not exists!");
-
-            File okClassFile = DepUtils.alignJarEntry(jarFile, classFile);
-            classes.add(okClassFile);
-
-        }else if(StringUtils.isNotBlank(request.getPattern())){
+        if(StringUtils.isNotBlank(request.getPattern())){
             File dirFile = new File(String.join(File.separator, rootPath, request.getDir()));
             Assert.isTrue(dirFile.exists(), request.getDir() + " not exists!");
 
@@ -507,6 +498,7 @@ public class JarDeployEndpoint {
      * @param jar64     base64Encoded
      * @return
      */
+    @Deprecated
     @PostMapping("/deploy/{baseJar64}/from/{jar64}")
     @ApiOperation(value = "同步依赖装配lib.jar至应用standalone.jar")
     public Tip mergeJars(@PathVariable("baseJar64") String baseJar64, @PathVariable("jar64") String jar64) throws IOException {
@@ -555,16 +547,18 @@ public class JarDeployEndpoint {
      * 创建索引
      *
      */
-    @PostMapping("/indexes")
+    @GetMapping("/indexes")
     @ApiOperation(value = "为.jar创建索引")
     public Tip createJarIndexes(@RequestParam(value = "dir", required = false) String dir,
                                 @RequestParam("jar") String jarFileName,
                                 @RequestParam(name = "pattern", required = false) String pattern,
-                                @RequestParam(name = "target", required = false) String target
+                                @RequestParam(name = "target", required = false) String target,
+                                @RequestParam(name = "recreate", required = false) Boolean recreate
                                 ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
         if(dir==null) dir="";
+        if(recreate==null) recreate=false;
 
         String targetPath = target;
         if(StringUtils.isNotBlank(target)){
@@ -572,20 +566,35 @@ public class JarDeployEndpoint {
             org.codehaus.plexus.util.FileUtils.mkdir(targetDir.getAbsolutePath());
             targetPath = targetDir.getAbsolutePath();
         }
+        final String finalTargetPath = targetPath;
 
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
         var list = ZipFileUtils.listFilesFromArchive(rootJarFile, pattern);
+        // clean up all indexing files first
+        if(recreate){
+            list.stream().forEach(entry -> {
+                String firstLetter = String.valueOf(org.codehaus.plexus.util.FileUtils.filename(entry.replace("/",File.separator)).charAt(0)).toLowerCase();
+                File letterFile = new File(String.join(File.separator, finalTargetPath, firstLetter));
+                try {
+                    org.codehaus.plexus.util.FileUtils.forceDelete(letterFile);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
 
         // create indexes files
-        final String finalTargetPath = targetPath;
         String jarFilename = rootJarFile.getName();
-        list.stream().map(key->{
+        list.stream()
+                .filter(f->org.codehaus.plexus.util.FileUtils.extension(f).equals("class"))
+                .map(key->{
             Map.Entry<String,String> entry = Map.entry(key, jarFilename);
             return entry;
         }).forEach(entry->{
-            String firstLetter = String.valueOf(entry.getKey().charAt(0));
+            String fileName = org.codehaus.plexus.util.FileUtils.filename(entry.getKey().replace("/", File.separator));
+            String firstLetter = String.valueOf(fileName.charAt(0)).toLowerCase();
             File letterFile = new File(String.join(File.separator, finalTargetPath, firstLetter));
 
             try {
@@ -599,7 +608,7 @@ public class JarDeployEndpoint {
                 // append to file
                 if(!contents.contains(entry.getKey())) {
                     BufferedWriter bw = new BufferedWriter(new FileWriter(letterFile, true));
-                    bw.append(String.join(",", entry.getKey(), entry.getValue(), "\n"));
+                    bw.append(String.join(",", fileName, entry.getValue(), entry.getKey(), "\n"));
                     bw.close();
                 }
             } catch (IOException e) {
