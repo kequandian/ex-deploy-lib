@@ -2,17 +2,17 @@ package com.jfeat.jar.dependency.comparable;
 
 import java.util.Map;
 
-public class KeyValue<K,V> implements Comparable<K>, Map.Entry<K, V> {
+public class ChecksumKeyValue<K,V> implements Comparable<K>, Map.Entry<K, V> {
 
     private Map.Entry<K,V> holder;
 
-    public KeyValue(K k, V v){
+    public ChecksumKeyValue(K k, V v){
         holder = Map.entry(k,v);
     }
 
     @Override
-    public int compareTo(Object o) {
-        return 0;
+    public int compareTo(K k) {
+        return holder.getKey().toString().compareTo(k.toString());
     }
 
     @Override

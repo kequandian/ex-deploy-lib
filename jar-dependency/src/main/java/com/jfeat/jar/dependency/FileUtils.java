@@ -32,7 +32,9 @@ public class FileUtils {
     /**
      * 依赖JAR包前缀锚点
      */
-    public static final String LIB_JAR_DIR = "BOOT-INF/lib/";
+    //@Deprecated
+    //public static final String LIB_JAR_DIR = "BOOT-INF/lib/";
+
     /**
      * JAR包通用后缀
      */

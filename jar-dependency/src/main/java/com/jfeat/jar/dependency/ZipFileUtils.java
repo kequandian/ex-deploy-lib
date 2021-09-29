@@ -1,6 +1,5 @@
 package com.jfeat.jar.dependency;
 
-import com.jfeat.jar.dependency.model.JarModel;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.util.FileUtils;
 
@@ -22,34 +21,29 @@ public class ZipFileUtils {
         String lib = "dependency-cli/lib/test.jar";
         File libFile = new File(lib);
 
-        List<JarModel> checksums = UnzipWithChecksum(libFile);
+        List<Map.Entry<String,Long>> checksums = UnzipWithChecksum(libFile);
         checksums.stream().forEach(x -> {
             System.out.println(x.toString());
         });
     }
 
-
-    public static List<String> listFilesFromArchive(File zipFile, String pattern) throws IOException{
+    public static List<String> listEntriesFromArchive(File zipFile, String pattern) throws IOException{
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
-                // Creating input stream that also maintains the checksum of
-                // the data which later can be used to validate data
-                // integrity.
-                CheckedInputStream cs =
-                        new CheckedInputStream(zipStream, new Adler32());
                 ZipInputStream zis =
-                        new ZipInputStream(new BufferedInputStream(cs))) {
+                        new ZipInputStream(new BufferedInputStream(zipStream))) {
 
             // within try
             ZipEntry entry = null;
-            List<String> list = new ArrayList<>();
+            List<String> entries = new ArrayList<>();
 
             while ((entry = zis.getNextEntry()) != null) {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
-                    list.add(entry.getName());
+                    entries.add(entry.getName());
                 }
             }
-            return list;
+
+            return entries;
         }
     }
 
@@ -111,21 +105,19 @@ public class ZipFileUtils {
         }
     }
 
-    public static List<JarModel> UnzipWithChecksum(File zipFile) throws IOException {
+    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile) throws IOException {
         return UnzipWithChecksum(zipFile, "", "");
     }
 
 
-
     /**
-     * 在zipFile中查找文件 pattern
+     * 在zipFile中获取匹配pattern文件的checksum信息并排序
      * @param zipFile
      * @param pattern 符合条件的搜索 （是否包含内容）
-     * @param target  解压到目标目录
      * @return
      * @throws IOException
      */
-    public static List<JarModel> UnzipWithChecksum(File zipFile, String pattern, String target) throws IOException {
+    public static List<Map.Entry<String,Long>> listEntriesWithChecksum(File zipFile, String pattern) throws IOException {
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
                 // Creating input stream that also maintains the checksum of
@@ -138,19 +130,54 @@ public class ZipFileUtils {
 
             // within try
             ZipEntry entry = null;
-            List<JarModel> checksums = new ArrayList<>();
+            List<Map.Entry<String,Long>> checksums = new ArrayList<>();
 
             // Read each entry from the ZipInputStream until no more entry
             // found indicated by a null return value of the getNextEntry()
             // method.
             while ((entry = zis.getNextEntry()) != null) {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
-                    JarModel jarModel = new JarModel();
+                    checksums.add(Map.entry(entry.getName(), entry.getCrc()));
+                }
+            }
+
+            // Print out the checksum value
+            return checksums;
+        }
+    }
+
+    /**
+     * 在zipFile中解压匹配pattern的文件
+     * @param zipFile
+     * @param pattern 符合条件的搜索 （是否包含内容）
+     * @param target  解压到目标目录
+     * @return
+     * @throws IOException
+     */
+    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile, String pattern, String target) throws IOException {
+        try (
+                InputStream zipStream = new FileInputStream(zipFile);
+                // Creating input stream that also maintains the checksum of
+                // the data which later can be used to validate data
+                // integrity.
+                CheckedInputStream cs =
+                        new CheckedInputStream(zipStream, new Adler32());
+                ZipInputStream zis =
+                        new ZipInputStream(new BufferedInputStream(cs))) {
+
+            // within try
+            ZipEntry entry = null;
+            List<Map.Entry<String,Long>> checksums = new ArrayList<>();
+
+            // Read each entry from the ZipInputStream until no more entry
+            // found indicated by a null return value of the getNextEntry()
+            // method.
+            while ((entry = zis.getNextEntry()) != null) {
+                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
                     long size = entry.getCrc();
-                    jarModel.setChecksum(size);
                     String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
                     String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName();
-                    jarModel.setJar(filename);
+                    Map.Entry<String,Long> jarModel = Map.entry(filename, size);
 
                     //if (size > 0) {
                         String dirname = FileUtils.dirname(zipFile.getAbsolutePath());

@@ -2,6 +2,7 @@ package com.jfeat.jar.dependency;
 
 import org.codehaus.plexus.util.FileUtils;
 
+import javax.management.BadAttributeValueExpException;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Enumeration;
@@ -9,6 +10,7 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
+import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.ZipOutputStream;
 
@@ -31,8 +33,23 @@ public class JarUpdate {
     /**
      * main()
      */
-    public static List<String> addFiles(File jarFile, List<File> inputFiles) throws IOException {
+    public static List<String> addFiles(File jarFile, List<File> inputFiles) throws Exception {
+        return addFiles(jarFile, inputFiles, new ArrayList<>());
+    }
+
+    public static List<String> addFiles(File jarFile, List<File> inputFiles, List<String> entryNames) throws Exception {
         //Assert.isTrue(inputFiles!=null && inputFiles.size()>0, "input files should not be empty !");
+        if(entryNames.size()==0 || entryNames.size()==inputFiles.size()){
+        }else{
+            throw new BadAttributeValueExpException("size of entryNames should be equal to inputFiles !");
+        }
+        // convert entryNames to map
+        var entryNamesHash =
+                entryNames.stream()
+                        .collect(Collectors.toMap(
+                                entry->org.codehaus.plexus.util.FileUtils.filename(entry.replace("/", File.separator)),
+                                entry->entry));
+
         // Create file descriptors for the jar and a temp jar.
         File tempJarFile = new File(jarFile.getAbsolutePath() + ".tmp");
 
@@ -40,8 +57,9 @@ public class JarUpdate {
         JarFile jar = new JarFile(jarFile);
         System.out.println(jarFile.getName() + " opened.");
 
-        // Initialize a flag that will indicate that the jar was updated.
         List<String> fileNames = new ArrayList<>();
+
+        // Initialize a flag that will indicate that the jar was updated.
         boolean jarUpdated = false;
 
         try {
@@ -58,12 +76,24 @@ public class JarUpdate {
             int bytesRead;
 
             try {
-                for(File inputFile : inputFiles) {
-                    // Open the given file.
-                    String fileName = getRelativeFilePath(jarFile, inputFile);
-                    FileInputStream fis = new FileInputStream(inputFile);
+                for (File inputFile : inputFiles) {
 
-                    fileNames.add(fileName);
+                    // Open the given file.
+                    String entryName = null;
+                    String inputFilename = FileUtils.filename(inputFile.getName());
+                    // found the match one, just use the given entry name
+                    // else use relative file path
+                    if(entryNames.stream().anyMatch(f->{
+                        return FileUtils.filename(f).equals(inputFilename);
+                    })){
+                        // contains filename
+                        entryName = entryNamesHash.get(inputFilename);
+                    }else{
+                        // use the relative file name directly
+                        entryName = getRelativeFilePath(jarFile, inputFile);
+                    }
+
+                    FileInputStream fis = new FileInputStream(inputFile);
 
                     try {
                         // Create a jar entry and add it to the temp jar.
@@ -74,7 +104,7 @@ public class JarUpdate {
                         fis.close();
 
 
-                        JarEntry entry = new JarEntry(fileName);
+                        JarEntry entry = new JarEntry(entryName);
                         entry.setMethod(ZipOutputStream.STORED);
                         //entry.setLevel(Deflater.NO_COMPRESSION);
                         entry.setSize(inputFile.length());
@@ -90,6 +120,9 @@ public class JarUpdate {
                         while ((bytesRead = fis.read(buffer)) != -1) {
                             tempJar.write(buffer, 0, bytesRead);
                         }
+
+                        // successful
+                        fileNames.add(entryName);
 
                         System.out.println(entry.getName() + " added.");
                     } finally {
@@ -108,7 +141,7 @@ public class JarUpdate {
                     // If the entry has not been added already, add it.
 
                     //if (! entry.getName().equals(fileName)) {
-                    if(fileNames.contains(entry.getName())){
+                    if (!entryNames.contains(entry.getName())) {
 
                         // Get an input stream for the entry.
 
@@ -125,27 +158,26 @@ public class JarUpdate {
                 }
 
                 jarUpdated = true;
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 System.out.println(ex);
 
                 // Add a stub entry here, so that the jar will close without an
                 // exception.
 
                 tempJar.putNextEntry(new JarEntry("stub"));
-            }
-            finally {
+            } finally {
                 tempJar.close();
             }
-        }
-        finally {
+        } finally {
             jar.close();
             System.out.println(jarFile.getName() + " closed.");
 
             // If the jar was not updated, delete the temp jar file.
 
-            if (! jarUpdated) {
+            if (!jarUpdated) {
                 tempJarFile.delete();
+
+                fileNames.clear();
             }
         }
 

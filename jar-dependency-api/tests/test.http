@@ -149,10 +149,18 @@ Content-Type: application/json
 {
     "dir": "classes",
     "pattern": "JarDeployEndpoint",
-    "jar": "jar-dependency-api-1.0.0.jar",
-    "target": "lib"
+    "jar": "jar-dependency-api-1.0.0.jar"
 }
-
+### depends
+GET {{endpoint}}/api/jar/dep/checksum
+?jar=jar-dependency-api-1.0.0.zip.temp
+# &pattern=JarDeployEndpoint
+&pattern=.class
+# &type=crc32
+### depends checksum mismatch
+GET {{endpoint}}/api/jar/dep/checksum/mismatch
+?baseJar=jar-dependency-api-1.0.0.zip.temp
+&jar=jar-dependency-api-1.0.0.jar
 ### depends 上传jar文件至lib目录
 POST {{endpoint}}/api/jar/dep/jars/upload/lib
 Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
@@ -166,20 +174,39 @@ Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar
 
 < ./target/jar-deploy-api-1.0.0.jar
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB--
+### inspect jar
+GET {{endpoint}}/api/jar/dep/inspect
+?jar=jar-dependency-api-1.0.0.jar
+# &dir=lib
+&pattern=JarDeployEndpoint
 ### depends list classes
 GET {{endpoint}}/api/jar/dep/jars
 ?all=true
 &dir=classes
+### extra classes
+POST {{endpoint}}/api/jar/dep/extract
+Content-Type: application/json
+
+{
+    "jar": "jar-dependency-api-1.0.0.jar",
+    "pattern": "JarDeployEndpoint",
+    "target": "classes"
+}
 ### depends list lib
 GET {{endpoint}}/api/jar/dep/jars
 ?all=true
 &dir=lib
+### depends list app
+GET {{endpoint}}/api/jar/dep/jars
+?all=true
 
+
+
+## deploy
 
 ### 自动查找standalone部署
 POST {{endpoint}}/api/jar/dep/from/amFyLWRlcGxveS1hcGktMS4wLjAuamFy
 Content-Type: application/json
-
 
 ### 对比两个jar注入
 //POST {{endpoint}}/api/jar/dep/checksum/to/{prodJar}/from/{uatJar}

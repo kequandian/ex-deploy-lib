@@ -1,19 +1,18 @@
 package com.jfeat.am.jar.dep.api;
 
-import com.google.common.hash.HashCode;
 import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
 import com.jfeat.am.jar.dep.request.JarRequest;
 import com.jfeat.am.jar.dep.util.DepUtils;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
+import com.jfeat.crud.base.tips.ErrorTip;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
-import com.jfeat.jar.dependency.model.JarModel;
+import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
@@ -212,80 +211,54 @@ public class JarDeployEndpoint {
         if(dir==null){ dir=""; }
 
         File jarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
-
-        // if type is not empty, just get the file checksum
-        if(StringUtils.isEmpty(type)) {
-            if (!jarFile.exists()) {
-                throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
-            }
-
-            List<JarModel> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
-            if (libDependencies != null && libDependencies.size() > 0) {
-                if (!StringUtils.isEmpty(pattern)) {
-                    libDependencies = libDependencies.stream()
-                            .filter(x -> x.getJar().contains(pattern))
-                            .collect(Collectors.toList());
-                }
-                return SuccessTip.create(libDependencies);
-            }
+        if (!jarFile.exists()) {
+            throw new BusinessException(BusinessCode.BadRequest, jarFileName + " not exists!");
         }
 
-        HashCode checksumCode = Files.hash(jarFile, Hashing.md5());
-        if(StringUtils.isNotEmpty(type)) {
-            final String[] supportedType  =new String[]{"adler32","crc32","crc32c","md5","sha1","sha256","sha512",
-                    "adler32l","crc32l","crc32cl","md5l","sha1l","sha256l","sha512l"};
+        // first get jar dependencies
+        List<Map.Entry<String,Long>> libDependencies = DependencyUtils.getChecksumsByJar(jarFile);
+        if (libDependencies != null && libDependencies.size() > 0) {
+            if (!StringUtils.isEmpty(pattern)) {
+                libDependencies = libDependencies.stream()
+                        .filter(x -> x.getKey().contains(pattern))
+                        .collect(Collectors.toList());
+            }
+            return SuccessTip.create(libDependencies);
+
+        }else if(StringUtils.isNotEmpty(type)) {
+            final String[] supportedType = new String[]{"adler32", "crc32", "crc32c", "md5", "sha1", "sha256", "sha512",
+                    "adler32l", "crc32l", "crc32cl", "md5l", "sha1l", "sha256l", "sha512l"};
             Assert.isTrue(Stream.of(supportedType).collect(Collectors.toList()).contains(type),
                     "supported type: " + String.join(",", supportedType));
-            switch (type) {
-                case "adler32":
-                case "adler32l":
-                    checksumCode = Files.hash(jarFile, Hashing.adler32());
-                    break;
-                case "crc32":
-                case "crc32l":
-                    checksumCode = Files.hash(jarFile, Hashing.crc32());
-                    break;
-                case "crc32c":
-                case "crc32cl":
-                    checksumCode = Files.hash(jarFile, Hashing.crc32c());
-                    break;
-                case "md5":
-                case "md5l":
-                    checksumCode = Files.hash(jarFile, Hashing.md5());
-                    break;
-                case "sha1":
-                case "sha1l":
-                    checksumCode = Files.hash(jarFile, Hashing.sha1());
-                    break;
-                case "sha256":
-                case "sha256l":
-                    checksumCode = Files.hash(jarFile, Hashing.sha256());
-                    break;
-                case "sha512":
-                case "sha512l":
-                    checksumCode = Files.hash(jarFile, Hashing.sha512());
-                    break;
-                default:
-                    break;
-            }
-        }else{
-            type = "adler32l";
+
+            return SuccessTip.create(Map.entry("checksum", type.endsWith("l") ?
+                    DepUtils.getFileChecksumAsLong(jarFile, type) :
+                    DepUtils.getFileChecksum(jarFile, type)));
         }
 
-        return SuccessTip.create(Map.entry("checksum", type.endsWith("l")?checksumCode.padToLong():checksumCode.toString()));
+        // default to get file checksum in jar file
+        var checksums = ZipFileUtils.listEntriesWithChecksum(jarFile, pattern);
+        return SuccessTip.create(checksums.stream()
+                .map(c->{
+                    return new ChecksumKeyValue<String,Long>(c.getKey(), c.getValue());
+                })
+                .sorted()
+                .collect(Collectors.toList()));
     }
+
 
     @GetMapping("/checksum/mismatch")
     @ApiOperation(value = "依据checksum检查两个jar的更新依赖")
-    public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar, @RequestParam("jar") String jar) {
+    public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar,
+                                    @RequestParam("jar") String jar) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
 
-        File rootJarFile = new File(String.join(File.separator, rootPath, baseJar));
-        if (!rootJarFile.exists()) {
+        File baseJarFile = new File(String.join(File.separator, rootPath, baseJar));
+        if (!baseJarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }
-        if (!rootJarFile.setReadable(true)) {
+        if (!baseJarFile.setReadable(true)) {
             throw new BusinessException(BusinessCode.FileReadingError);
         }
         File jarFile = new File(String.join(File.separator, rootPath, jar));
@@ -297,10 +270,41 @@ public class JarDeployEndpoint {
         }
 
         // get mismatch
-        List<JarModel> baseJarChecksum = DependencyUtils.getChecksumsByJar(rootJarFile);
-        List<JarModel> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
+        // first match jar dependencies
+        List<Map.Entry<String,Long>> baseJarChecksum = DependencyUtils.getChecksumsByJar(baseJarFile);
+        List<Map.Entry<String,Long>> jarChecksum = DependencyUtils.getChecksumsByJar(jarFile);
+        if(baseJarChecksum.size()>0 && jarChecksum.size()>0){
+            return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
 
-        return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarChecksum, jarChecksum));
+        }else if(baseJarChecksum.size()==0 && jarChecksum.size()==0){
+            // compare files
+            List<Map.Entry<String,Long>> baseJarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(baseJarFile, ".class");
+            List<Map.Entry<String,Long>> jarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(jarFile, ".class");
+            return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarEntryChecksum, jarEntryChecksum));
+
+        }else if(baseJarChecksum.size()>0 || jarChecksum.size()>0) {
+            File JarFile = jarFile;
+            List<Map.Entry<String,Long>> BaseJarChecksum = baseJarChecksum;
+            if(jarChecksum.size()>0){
+                JarFile = baseJarFile;
+                BaseJarChecksum = jarChecksum;
+            }
+
+            List<Map.Entry<String,Long>> list = new ArrayList<>();
+
+            String filename =  JarFile.getName();
+            var query = BaseJarChecksum.stream()
+                    .filter(x-> org.codehaus.plexus.util.FileUtils.filename(x.getKey().replace("/", File.separator)).equals(filename))
+                    .collect(Collectors.toList());
+            Assert.isTrue(query.size()<=1, "multi match within: " + baseJar);
+            String commonKey = query.get(0).getKey();
+
+            var entry = Map.entry(commonKey, DepUtils.getFileChecksumAsLong(JarFile, "adler32"));
+            list.add(entry);
+            return SuccessTip.create(DependencyUtils.getDifferentChecksums(BaseJarChecksum, list));
+        }
+
+        return SuccessTip.create(new ArrayList<>());
     }
 
     /// deploy
@@ -316,7 +320,7 @@ public class JarDeployEndpoint {
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
-        var list = ZipFileUtils.listFilesFromArchive(rootJarFile, pattern);
+        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, pattern);
         return SuccessTip.create(list);
     }
 
@@ -361,7 +365,7 @@ public class JarDeployEndpoint {
             File jarFile = new File(String.join(File.separator, rootPath, Dir, jar));
             Assert.isTrue(jarFile.exists(), jar + " not exists!");
             if (org.apache.commons.lang3.StringUtils.isBlank(pattern)) {
-                return SuccessTip.create(ZipFileUtils.listFilesFromArchive(jarFile, pattern));
+                return SuccessTip.create(ZipFileUtils.listEntriesFromArchive(jarFile, pattern));
             }
 
             var unzipFiles = ZipFileUtils.unzipFilesFromArchiva(jarFile, pattern, target);
@@ -444,7 +448,7 @@ public class JarDeployEndpoint {
         // try to handle the complex jar
         String jar = request.getJar().contains(":") ? request.getJar().substring(request.getJar().indexOf(":")+1) : request.getJar();
 
-        String jarPath = String.join(File.separator, rootPath, request.getDir(), jar);
+        String jarPath = String.join(File.separator, rootPath, request.getTarget(), jar);
         File jarFile = new File(jarPath);
         Assert.isTrue(jarFile.exists() || request.getJar().contains(":"), jar + " not exist !");
 
@@ -454,10 +458,10 @@ public class JarDeployEndpoint {
             File baseJarFile = new File(String.join(File.separator, rootPath, baseJar));
             Assert.isTrue(baseJarFile.exists(), baseJar + " not exists ！");
             // get from base jar
-            List<JarModel> checksums =  DepUtils.extraFilesFromJar(rootPath, "", baseJar, jar, request.getTarget());
+            List<Map.Entry<String,Long>> checksums =  DepUtils.extraFilesFromJar(rootPath, "", baseJar, jar, request.getTarget());
             Assert.isTrue(checksums.size()==1, jar + " must be unique within: " + baseJar);
 
-            jarPath = String.join(File.separator, rootPath, checksums.get(0).getJar());
+            jarPath = String.join(File.separator, rootPath, checksums.get(0).getKey());
             jarFile = new File(jarPath);
         }
         
@@ -486,8 +490,28 @@ public class JarDeployEndpoint {
         // update into zip/jar
         //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
         //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
-         List<String> result = JarUpdate.addFiles(jarFile, classes);
-        return SuccessTip.create(result);
+        //
+        try {
+            // map jar entry names from jar file
+            var entryNames =
+                    ZipFileUtils.listEntriesFromArchive(jarFile, ".class")
+                            .stream()
+                            .collect(Collectors.toMap(
+                                    entry->org.codehaus.plexus.util.FileUtils.filename(entry.replace("/", File.separator)),
+                                    entry->entry));
+
+            // convert filenames to jar entry names
+            var entries = classes.stream().map(file -> {
+                String filename = org.codehaus.plexus.util.FileUtils.filename(file.getName());
+                return entryNames.get(filename);
+            }).collect(Collectors.toList());
+
+            List<String> result = JarUpdate.addFiles(jarFile, classes, entries);
+            return SuccessTip.create(result);
+
+        }catch (Exception e){
+            return ErrorTip.create(BusinessCode.Reserved);
+        }
     }
 
 
@@ -519,7 +543,7 @@ public class JarDeployEndpoint {
         if (!jarFile.exists()) {
             throw new BusinessException(BusinessCode.FileNotFound);
         }
-        File libFile = DepUtils.alignJarEntry(jarFile, rootJarFile);
+        File libFile = DepUtils.alignFileJarEntry(jarFile, rootJarFile);
         if (!libFile.setReadable(true)) {
             throw new BusinessException(BusinessCode.FileReadingError);
         }
@@ -571,7 +595,7 @@ public class JarDeployEndpoint {
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
-        var list = ZipFileUtils.listFilesFromArchive(rootJarFile, pattern);
+        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, pattern);
         // clean up all indexing files first
         if(recreate){
             list.stream().forEach(entry -> {

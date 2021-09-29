@@ -1,6 +1,6 @@
 package com.jfeat.jar.dependency;
 
-import com.jfeat.jar.dependency.model.JarModel;
+import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import static com.jfeat.jar.dependency.FileUtils.JAR_SUFFIX;
 import static java.util.function.Predicate.not;
 
 /**
@@ -59,7 +60,7 @@ public class DependencyUtils {
 
     public static List<String> getDependencies(String path){
         List<String> d;
-        if(path.endsWith(FileUtils.JAR_SUFFIX)){
+        if(path.endsWith(JAR_SUFFIX)){
             File jarFile = new File(path);
             d = DependencyUtils.getDependenciesByJar(jarFile);
             d.addAll(DependencyUtils.getDependenciesByPomModel(FileUtils.getPomModelByJar(jarFile)));
@@ -83,10 +84,10 @@ public class DependencyUtils {
             Set<String> names = new HashSet<>();
             // 循环遍历压缩包内文件对象
             while ((zipEntry = zis.getNextEntry()) != null) {
-                names.add(zipEntry.getName().replace(FileUtils.LIB_JAR_DIR,""));
+                names.add(zipEntry.getName());
             }
             names.stream()
-                    .filter(s -> s.endsWith(FileUtils.JAR_SUFFIX))
+                    .filter(s -> s.endsWith(JAR_SUFFIX))
                     .collect(Collectors.toCollection(() -> dependencies));
             if (dependencies.isEmpty()) {
                 return getDependenciesByPomModel(FileUtils.getPomModelByJar(jarFile));
@@ -104,22 +105,20 @@ public class DependencyUtils {
      * @param jarFile 目标JAR包
      * @return java.util.List<java.lang.String>
      */
-    public static List<JarModel> getChecksumsByJar(File jarFile) {
-        List<JarModel> dependencies = new ArrayList<>();
+    public static List<Map.Entry<String,Long>> getChecksumsByJar(File jarFile) {
+        List<Map.Entry<String,Long>> dependencies = new ArrayList<>();
         // 不解压读取压缩包中的文件内容
         try (ZipInputStream zis = new ZipInputStream(new FileInputStream(jarFile))) {
             ZipEntry zipEntry;
-            Set<JarModel> names = new HashSet<>();
+            Set<Map.Entry<String,Long>> names = new HashSet<>();
 
             // 循环遍历压缩包内文件对象
             while ((zipEntry = zis.getNextEntry()) != null) {
-                JarModel model = new JarModel();
-                model.setJar(zipEntry.getName().replace(FileUtils.LIB_JAR_DIR,""));
-                model.setChecksum(zipEntry.getCrc());
+                Map.Entry<String,Long> model = Map.entry(zipEntry.getName(), zipEntry.getCrc());
                 names.add(model);
             }
             names.stream()
-                    .filter(s -> s.getJar().endsWith(FileUtils.JAR_SUFFIX))
+                    .filter(s -> s.getKey().endsWith(JAR_SUFFIX))
                     .collect(Collectors.toCollection(() -> dependencies));
             return dependencies;
 
@@ -183,14 +182,18 @@ public class DependencyUtils {
         return target.stream().filter(not(origin::contains)).sorted().collect(Collectors.toList());
     }
 
-    public static List<JarModel> getDifferentChecksums(List<JarModel> origin, List<JarModel> target) {
+    public static List<Map.Entry<String,Long>> getDifferentChecksums(List<Map.Entry<String,Long>> origin, List<Map.Entry<String,Long>> target) {
         return target.stream()
                 .filter(u-> {
-                    for(JarModel checksum : origin){
-                        return checksum.getChecksum() != u.getChecksum();
+                    for(Map.Entry<String,Long> checksum : origin){
+                        if(checksum.getKey().equals(u.getKey())) {
+                            return ! checksum.getValue().equals(u.getValue());
+                        }
                     }
                     return false;
                 })
+                // convert to ChecksumKeyValue
+                .map(u->new ChecksumKeyValue<String,Long>(u.getKey(), u.getValue()))
                 .sorted()
                 .collect(Collectors.toList());
     }
@@ -200,17 +203,15 @@ public class DependencyUtils {
         final String regrex$ = "(-\\$\\{[\\w\\.\\-]+\\}).jar";
 
         var queryOrigin = origin.stream()
-                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"))
+                .map(u->u.replaceFirst(regrex, JAR_SUFFIX).replaceFirst(regrex$,JAR_SUFFIX))
                 .collect(Collectors.toList());
         //queryOrigin.forEach(u->{System.out.println(u.toString());});
 
-
         var query = target.stream()
-                .map(u->u.replaceFirst(regrex, ".jar").replaceFirst(regrex$,".jar"))
+                .map(u->u.replaceFirst(regrex, JAR_SUFFIX).replaceFirst(regrex$,JAR_SUFFIX))
                 .filter(not(queryOrigin::contains))
                 .sorted()
                 .collect(Collectors.toList());
-        //query.forEach(u->{System.out.println(u.toString());});
         return query;
     }
 
@@ -255,6 +256,9 @@ public class DependencyUtils {
      * @return java.util.List<java.lang.String>
      */
     public static List<String> getErrorDependencies(List<String> target) {
-        return target.stream().filter(not(DependencyUtils::isLegal)).sorted().collect(Collectors.toList());
+        return target.stream()
+                .filter(not(DependencyUtils::isLegal))
+                .sorted()
+                .collect(Collectors.toList());
     }
 }
