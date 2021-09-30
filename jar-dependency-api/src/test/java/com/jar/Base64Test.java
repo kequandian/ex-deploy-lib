@@ -1,10 +1,12 @@
 package com.jar;
 
+import org.apache.commons.lang3.StringUtils;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.Assert;
 
+import java.io.File;
 import java.util.Base64;
 
 public class Base64Test{
@@ -12,6 +14,10 @@ public class Base64Test{
 
     @Test
     public void TestDecode(){
+        String str=  "\\myString.java";
+        String res = StringUtils.stripStart(str, File.separator);
+
+
         String baseJar64 = "amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=";
         String baseJar = new String(Base64.getDecoder().decode(baseJar64));
         logger.info(baseJar);

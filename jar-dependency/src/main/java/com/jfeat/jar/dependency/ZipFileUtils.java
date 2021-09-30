@@ -150,7 +150,7 @@ public class ZipFileUtils {
      * 在zipFile中解压匹配pattern的文件
      * @param zipFile
      * @param pattern 符合条件的搜索 （是否包含内容）
-     * @param target  解压到目标目录
+     * @param target  解压到目标目录 (绝对路径)
      * @return
      * @throws IOException
      */
@@ -175,29 +175,40 @@ public class ZipFileUtils {
             while ((entry = zis.getNextEntry()) != null) {
                 if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
                     long size = entry.getCrc();
+
                     String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
-                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName();
-                    Map.Entry<String,Long> jarModel = Map.entry(filename, size);
+                    String targetFilename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName().replace('/', File.separatorChar);
 
+                    Map.Entry<String,Long> checksum = Map.entry(targetFilename, size);
                     //if (size > 0) {
-                        String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
-                        String entryFullName = String.join(File.separator,dirname,
-                                ( StringUtils.isNotBlank(target)? filename: entry.getName()) );
-                        FileUtils.mkdir(FileUtils.dirname(entryFullName));
+                        String entryFullName = StringUtils.isNotBlank(target)?
+                                (String.join(File.separator, target, entryFilename)) :
+                                (String.join(File.separator, FileUtils.dirname(zipFile.getAbsolutePath()), entryFilename));
 
-                        byte[] buffer = new byte[1048];
-                        try (FileOutputStream fos =
-                                     new FileOutputStream(entryFullName);
-                             BufferedOutputStream bos =
-                                     new BufferedOutputStream(fos, buffer.length)) {
-
-                            while ((size = zis.read(buffer, 0, buffer.length)) != -1) {
-                                bos.write(buffer, 0, (int) size);
-                            }
-                            bos.flush();
+                                File entryDirFile = new File(FileUtils.dirname(entryFullName));
+                        if(!entryDirFile.exists()){
+                            FileUtils.forceMkdir(entryDirFile);
                         }
 
-                        checksums.add(jarModel);
+                        if(entryDirFile.exists()) {
+                            byte[] buffer = new byte[1048];
+                            try (FileOutputStream fos =
+                                         new FileOutputStream(entryFullName);
+                                 BufferedOutputStream bos =
+                                         new BufferedOutputStream(fos, buffer.length)) {
+
+                                while ((size = zis.read(buffer, 0, buffer.length)) != -1) {
+                                    bos.write(buffer, 0, (int) size);
+                                }
+                                bos.flush();
+                            }
+
+                            // success
+                            checksums.add(checksum);
+
+                        }else{
+                            throw new IOException("fail to create dictionary: " + entryDirFile);
+                        }
                     //}
                 }
             }

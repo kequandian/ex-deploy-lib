@@ -1,5 +1,8 @@
 package com.jfeat.jar.dependency.comparable;
 
+import org.codehaus.plexus.util.FileUtils;
+
+import java.io.File;
 import java.util.Map;
 
 public class ChecksumKeyValue<K,V> implements Comparable<K>, Map.Entry<K, V> {
@@ -12,7 +15,8 @@ public class ChecksumKeyValue<K,V> implements Comparable<K>, Map.Entry<K, V> {
 
     @Override
     public int compareTo(K k) {
-        return holder.getKey().toString().compareTo(k.toString());
+        return FileUtils.filename(holder.getKey().toString().replace("/", File.separator))
+                .compareTo(FileUtils.filename(k.toString().replace("/", File.separator)));
     }
 
     @Override

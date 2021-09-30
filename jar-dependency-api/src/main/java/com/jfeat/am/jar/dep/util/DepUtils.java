@@ -7,6 +7,7 @@ import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.ZipFileUtils;
+import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.Assert;
@@ -203,6 +204,17 @@ public class DepUtils {
             }
         }
 
-        return ZipFileUtils.UnzipWithChecksum(rootJarFile, pattern, target);
+        var checkums = ZipFileUtils.UnzipWithChecksum(rootJarFile, pattern, target);
+
+        StringUtils.trim(File.separator.toString());
+        // remove rootPath from checksum
+        return checkums.stream()
+                // remove rootPath
+                .map(entry->new ChecksumKeyValue<String,Long>(
+                        StringUtils.stripStart(entry.getKey().replace(rootPath, ""), File.separator)
+                        ,
+                        entry.getValue()))
+                .sorted()
+                .collect(Collectors.toList());
     }
 }

@@ -1,6 +1,5 @@
 package com.jfeat.am.jar.dep.api;
 
-import com.google.common.hash.Hashing;
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
 import com.jfeat.am.jar.dep.request.JarRequest;
 import com.jfeat.am.jar.dep.util.DepUtils;
@@ -330,7 +329,10 @@ public class JarDeployEndpoint {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
 
-        var checksums =  DepUtils.extraFilesFromJar(rootPath, request.getDir(), request.getJar(), request.getPattern(), request.getTarget());
+        // convert to target
+        String absTarget = String.join(File.separator, rootPath, request.getTarget());
+
+        var checksums =  DepUtils.extraFilesFromJar(rootPath, request.getDir(), request.getJar(), request.getPattern(), absTarget);
         return SuccessTip.create(checksums);
     }
 
