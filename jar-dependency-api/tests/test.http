@@ -1,18 +1,25 @@
 @endpoint=http://localhost:8080
 
 ### 发送jar文件至lib目录
+// 以表单形式上传 
 POST {{endpoint}}/api/jar/dep/jars/upload/lib
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Type: multipart/form-data; boundary=WebKitFormBoundaryAFRaG58f2nIb0mPB
 
-------WebKitFormBoundaryAFRaG58f2nIb0mPB
-Content-Disposition: form-data; name="file"
+--WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: form-data; name=file; filename=jar-dependency-api-1.0.0.jar
 
-title
-------WebKitFormBoundaryAFRaG58f2nIb0mPB
-Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar"
+< ../target/jar-dependency-api-1.0.0.jar
+--WebKitFormBoundaryAFRaG58f2nIb0mPB--
 
-< ./target/jar-deploy-api-1.0.0.jar
-------WebKitFormBoundaryAFRaG58f2nIb0mPB--
+
+### 发送jar文件至lib目录 (base64)
+POST {{endpoint}}/api/jar/dep/jars/upload64/lib
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename=test.jar
+
+data:attachment/jar;base64,dGVzdA==
+
+
 
 ### 查询根目录下的JAR
 //all: 是否显示所有文件

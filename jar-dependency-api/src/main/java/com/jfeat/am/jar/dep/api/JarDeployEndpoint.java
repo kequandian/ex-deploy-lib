@@ -3,6 +3,7 @@ package com.jfeat.am.jar.dep.api;
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
 import com.jfeat.am.jar.dep.request.JarRequest;
 import com.jfeat.am.jar.dep.util.DepUtils;
+import com.jfeat.am.jar.dep.util.UploadUtils;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.ErrorTip;
@@ -28,6 +29,7 @@ import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import javax.servlet.http.HttpServletRequest;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -49,55 +51,48 @@ public class JarDeployEndpoint {
     private JarDeployProperties jarDeployProperties;
 
     @PostMapping("/jars/upload/{dir}")
-    @ApiOperation(value = "发送.jar至指定目录")
+    @ApiOperation(value = "发送.jar至指定目(支持base64格式)")
     public Tip uploadJarFile(@RequestPart("file") MultipartFile file,
-                             @PathVariable(value = "dir", required = false) String dir) {
-        if (file.isEmpty()) {
-            throw new BusinessException(BusinessCode.BadRequest, "file is empty");
-        }
-        Long fileSize = file.getSize();
-        if (fileSize == 0) {
-            throw new BusinessException(BusinessCode.BadRequest, "file is empty");
-        }
-        /// end sanity
+                             @PathVariable(value = "dir", required = false) String dir) throws IOException {
         if(dir==null) dir="";
-
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
         Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
 
-        File subPathFile = new File(String.join(File.separator, rootPath, dir));
-        if (!StringUtils.isEmpty(dir)) {
-            if (!subPathFile.exists()) {
-                subPathFile.mkdirs();
-            }
+        File uploadedFile = null;
+        if(file!=null && !file.isEmpty()) {
+            uploadedFile = UploadUtils.doMultipartFile(file, String.join(File.separator, rootPath, dir));
         }
 
-        String originalFileName = file.getOriginalFilename();
-        try {
-            File target = new File(String.join(File.separator, subPathFile.getAbsolutePath(), originalFileName));
-            String path = target.getCanonicalPath();
-            boolean readable = target.setReadable(true);
-            if (readable) {
-                logger.info("file uploading to: {}", path);
-                FileUtils.copyInputStreamToFile(file.getInputStream(), target);
-                logger.info("file uploaded to: {}", target.getAbsolutePath());
+        // get relative path
+        File appFile = new File("./");
+        String relativePath = uploadedFile.getAbsolutePath();
+        relativePath = relativePath.substring(appFile.getAbsolutePath().length() - 1, relativePath.length());
+        logger.info("relative path={}", relativePath);
 
-                // get relative path
-                File appFile = new File("./");
-                String relativePatht = target.getAbsolutePath();
-                relativePatht = relativePatht.substring(appFile.getAbsolutePath().length() - 1, relativePatht.length());
-                logger.info("relativePatht={}", relativePatht);
-
-                return SuccessTip.create(relativePatht);
-
-            } else {
-                throw new BusinessException(BusinessCode.UploadFileError, "file is not readable");
-            }
-        } catch (Exception e) {
-            throw new BusinessException(BusinessCode.GeneralIOError);
-        }
+        return SuccessTip.create(relativePath);
     }
+
+    @PostMapping("/jars/upload64/{dir}")
+    @ApiOperation(value = "发送.jar至指定目(支持base64格式)")
+    public Tip uploadJarFileBase64(@PathVariable(value = "dir", required = false) String dir,
+                             HttpServletRequest request) throws IOException {
+        if(dir==null) dir="";
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootPathFile = new File(rootPath);
+        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+
+        File uploadedFile = UploadUtils.doBase64File(request, String.join(File.separator, rootPath, dir));
+
+        // get relative path
+        File appFile = new File("./");
+        String relativePath = uploadedFile.getAbsolutePath();
+        relativePath = relativePath.substring(appFile.getAbsolutePath().length() - 1, relativePath.length());
+        logger.info("relative path={}", relativePath);
+
+        return SuccessTip.create(relativePath);
+    }
+
 
     @GetMapping("/jars")
     @ApiOperation(value = "获取配置目录下指定目录下的所有jar文件")
