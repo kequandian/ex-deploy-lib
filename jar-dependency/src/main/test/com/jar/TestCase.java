@@ -4,12 +4,12 @@ import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
+import static com.jfeat.jar.dependency.FileUtils.getRelativePath;
 import static java.util.function.Predicate.not;
 
 public class TestCase {
@@ -72,4 +72,12 @@ public class TestCase {
                 .collect(Collectors.toList());
         query.forEach(u->{System.out.println(u.toString());});
     }
+
+    @Test
+    public void TestRelativeFilePath(){
+        String result = getRelativePath("/path/to/one/filename.jar", "/path/to/two/filename.class");
+        System.out.println(result);
+        Assert.assertTrue(result.equals("two/filename.class"));
+    }
+
 }

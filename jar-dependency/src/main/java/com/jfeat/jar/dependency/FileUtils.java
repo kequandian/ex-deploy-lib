@@ -149,16 +149,32 @@ public class FileUtils {
     }
 
     /**
-     * 获取 file文件的相对路径
-     * @param baseFile
-     * @param file
+     * 获取文件的相对路径
+     * @param referenceFile 参照文件
+     * @param file  目标文件相对路径
      * @return
      */
-    public static String getRelativeFilePath(File baseFile, File file) {
-        String entryPath = org.codehaus.plexus.util.FileUtils.dirname(file.getAbsolutePath())
-                .substring(org.codehaus.plexus.util.FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
+    public static String getRelativeFilePath(File referenceFile, File file) {
+        String firstFilePath = referenceFile.getAbsolutePath();
+        String filePath = file.getAbsolutePath();
 
-        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()))
-                .replace(File.separator, "/");
+        String commonPath = org.codehaus.plexus.util.FileUtils.dirname(filePath);
+        while (!firstFilePath.startsWith(commonPath)){
+            commonPath = org.codehaus.plexus.util.FileUtils.dirname(commonPath);
+        }
+        return filePath.replace(commonPath, "");
+
+//        String entryPath = FileUtils.dirname(file.getAbsolutePath())
+//                .substring(ileUtils.dirname(referenceFile.getAbsolutePath()).length() + 1);
+//
+//        return String.join(File.separator, entryPath, org.codehaus.plexus.util.FileUtils.filename(file.getAbsolutePath()));
+    }
+
+    public static String getRelativePath(String referencePath, String filePath) {
+        String commonPath = org.codehaus.plexus.util.FileUtils.dirname(filePath);
+        while (!referencePath.startsWith(commonPath)){
+            commonPath = org.codehaus.plexus.util.FileUtils.dirname(commonPath);
+        }
+        return filePath.replace(commonPath, "");
     }
 }

@@ -27,7 +27,15 @@ public class ZipFileUtils {
         });
     }
 
-    public static List<String> listEntriesFromArchive(File zipFile, String pattern) throws IOException{
+    /**
+     *  大JAR文件中列出压缩文件
+     * @param zipFile
+     * @param entryExtension 文件类型过滤
+     * @param entryPattern  文件名匹配过滤 （包含逻辑）
+     * @return
+     * @throws IOException
+     */
+    public static List<String> listEntriesFromArchive(File zipFile, String entryExtension, String entryPattern) throws IOException{
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
                 ZipInputStream zis =
@@ -38,7 +46,9 @@ public class ZipFileUtils {
             List<String> entries = new ArrayList<>();
 
             while ((entry = zis.getNextEntry()) != null) {
-                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(FileUtils.extension(entry.getName()))) &&
+                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
+                ){
                     entries.add(entry.getName());
                 }
             }
@@ -50,12 +60,13 @@ public class ZipFileUtils {
     /**
      * 在jar文件中解压文件
      * @param zipFile
-     * @param pattern 符合条件的搜索 （是否包含内容）
-     * @param target  解压到目标目录
+     * @param entryExtension 文件后缀类型过滤
+     * @param entryPattern 符合条件的搜索 （是否包含）
+     * @param targetPath  解压到目标目录
      * @return
      * @throws IOException
      */
-    public static List<String> unzipFilesFromArchiva(File zipFile, String pattern, String target) throws IOException {
+    public static List<String> unzipFilesFromArchiva(File zipFile, String entryExtension, String entryPattern, File targetPath) throws IOException {
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
                 // Creating input stream that also maintains the checksum of
@@ -74,14 +85,16 @@ public class ZipFileUtils {
             // found indicated by a null return value of the getNextEntry()
             // method.
             while ((entry = zis.getNextEntry()) != null) {
-                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(FileUtils.extension(entry.getName()))) &&
+                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
+                ) {
                     long size = entry.getCrc();
-                    String filename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, FileUtils.filename(entry.getName()))) : entry.getName();
+                    String relativePath = getRelativeFilePath(zipFile, targetPath);
+                    String filename = targetPath!=null? (String.join(File.separator, relativePath, FileUtils.filename(entry.getName()))) : entry.getName();
 
                     if (size > 0) {
                         String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
-                        String entryFullName = String.join(File.separator,dirname,
-                                ( StringUtils.isNotBlank(target)? filename: entry.getName()) );
+                        String entryFullName = String.join(File.separator,dirname, (targetPath!=null? filename: entry.getName()) );
                         FileUtils.mkdir(FileUtils.dirname(entryFullName));
 
                         byte[] buffer = new byte[1048];
@@ -106,18 +119,19 @@ public class ZipFileUtils {
     }
 
     public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile) throws IOException {
-        return UnzipWithChecksum(zipFile, "", "");
+        return UnzipWithChecksum(zipFile, "", "", null);
     }
 
 
     /**
      * 在zipFile中获取匹配pattern文件的checksum信息并排序
      * @param zipFile
-     * @param pattern 符合条件的搜索 （是否包含内容）
+     * @param entryExtension 文件后缀过滤
+     * @param entryPattern 符合条件的搜索 （是否包含内容）
      * @return
      * @throws IOException
      */
-    public static List<Map.Entry<String,Long>> listEntriesWithChecksum(File zipFile, String pattern) throws IOException {
+    public static List<Map.Entry<String,Long>> listEntriesWithChecksum(File zipFile, String entryExtension, String entryPattern) throws IOException {
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
                 // Creating input stream that also maintains the checksum of
@@ -136,7 +150,9 @@ public class ZipFileUtils {
             // found indicated by a null return value of the getNextEntry()
             // method.
             while ((entry = zis.getNextEntry()) != null) {
-                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(FileUtils.extension(entry.getName()))) &&
+                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
+                ) {
                     checksums.add(Map.entry(entry.getName(), entry.getCrc()));
                 }
             }
@@ -149,12 +165,13 @@ public class ZipFileUtils {
     /**
      * 在zipFile中解压匹配pattern的文件
      * @param zipFile
-     * @param pattern 符合条件的搜索 （是否包含内容）
-     * @param target  解压到目标目录 (绝对路径)
+     * @param entryExtension 文件后缀过滤条件
+     * @param entryPattern 包含此字符串的文件
+     * @param targetPath  解压到目标目录 (绝对路径)
      * @return
      * @throws IOException
      */
-    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile, String pattern, String target) throws IOException {
+    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile, String entryExtension, String entryPattern, File targetPath) throws IOException {
         try (
                 InputStream zipStream = new FileInputStream(zipFile);
                 // Creating input stream that also maintains the checksum of
@@ -173,16 +190,21 @@ public class ZipFileUtils {
             // found indicated by a null return value of the getNextEntry()
             // method.
             while ((entry = zis.getNextEntry()) != null) {
-                if (StringUtils.isBlank(pattern) || entry.getName().contains(pattern)) {
+                String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
+                String extension = FileUtils.extension(entryFilename);
+
+                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(extension)) &&
+                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
+                ) {
                     long size = entry.getCrc();
 
-                    String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
-                    String targetFilename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName().replace('/', File.separatorChar);
+                    //String targetFilename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName().replace('/', File.separatorChar);
+                    String targetFilename = targetPath==null? entry.getName().replace('/', File.separatorChar) : (String.join(File.separator, targetPath.getAbsolutePath(), entryFilename));
 
                     Map.Entry<String,Long> checksum = Map.entry(targetFilename, size);
                     //if (size > 0) {
-                        String entryFullName = StringUtils.isNotBlank(target)?
-                                (String.join(File.separator, target, entryFilename)) :
+                        String entryFullName = targetPath!=null?
+                                (String.join(File.separator, getRelativeFilePath(zipFile, targetPath), entryFilename)) :
                                 (String.join(File.separator, FileUtils.dirname(zipFile.getAbsolutePath()), entryFilename));
 
                                 File entryDirFile = new File(FileUtils.dirname(entryFullName));

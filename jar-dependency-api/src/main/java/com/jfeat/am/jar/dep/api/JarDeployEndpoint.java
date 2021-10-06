@@ -433,135 +433,33 @@ public class JarDeployEndpoint {
     }
 
 
+    @PostMapping("/deploy/{type}")
+    @ApiOperation(value = "部署type类型(class)的文件")
+    public Tip deployClasses(@RequestBody JarRequest request,
+                             @PathVariable("type") String fileExtension) throws IOException{
+        String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+
+        String jarPath = String.join(File.separator, rootPath, request.getTarget(),  request.getJar());
+        File jarFile = new File(jarPath);
+        Assert.isTrue(jarFile.exists(), jarFile.getAbsolutePath() + " not exists!");
+
+        var deployedList  =DepUtils.deployFilesToJar(rootPath, request.getDir(), fileExtension, request.getPattern(), jarFile);
+        return SuccessTip.create(deployedList);
+    }
+
+
     @PostMapping("/deploy")
     @ApiOperation(value = "仅部署")
     public Tip compileJarFile(@RequestBody JarRequest request) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
-        Assert.isTrue(StringUtils.isNotBlank(request.getJar()), "jar cannot be empty!");
 
-        //the jar may be from another base jar
-        //format: app.jar:jar-dependency-1.0.0.jar
-        // try to handle the complex jar
-        String jar = request.getJar().contains(":") ? request.getJar().substring(request.getJar().indexOf(":")+1) : request.getJar();
+        var deployedList  =DepUtils.deployFilesToJarEntry(request.getJar(), );
 
-        String jarPath = String.join(File.separator, rootPath, request.getTarget(), jar);
-        File jarFile = new File(jarPath);
-        Assert.isTrue(jarFile.exists() || request.getJar().contains(":"), jar + " not exist !");
-
-        if(!jarFile.exists() && request.getJar().contains(":") ){
-            // get the base jar
-            String baseJar = request.getJar().substring(0, request.getJar().indexOf(":"));
-            File baseJarFile = new File(String.join(File.separator, rootPath, baseJar));
-            Assert.isTrue(baseJarFile.exists(), baseJar + " not exists ！");
-            // get from base jar
-            List<Map.Entry<String,Long>> checksums =  DepUtils.extraFilesFromJar(rootPath, "", baseJar, jar, request.getTarget());
-            Assert.isTrue(checksums.size()==1, jar + " must be unique within: " + baseJar);
-
-            jarPath = String.join(File.separator, rootPath, checksums.get(0).getKey());
-            jarFile = new File(jarPath);
-        }
-        
-        List<File> classes = new ArrayList<>();
-
-        // dir/javaclass -> classes/javaname.class
-        // target to .jar
-        if(StringUtils.isNotBlank(request.getPattern())){
-            File dirFile = new File(String.join(File.separator, rootPath, request.getDir()));
-            Assert.isTrue(dirFile.exists(), request.getDir() + " not exists!");
-
-            File[] listOfFiles = dirFile.listFiles();
-            Stream.of(listOfFiles)
-                    .filter(f -> FilenameUtils.getExtension(f.getName()).equals("class"))
-                    .filter(f -> f.getName().contains(request.getPattern()))
-                    .map(
-                        f ->{ 
-                            return new File(String.join(File.separator, rootPath, request.getDir(), f.getName()));
-                        }
-                    )
-                    .forEach(f->{
-                        classes.add(f);
-                    });
-        }
-
-        // update into zip/jar
-        //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
-        //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
-        //
-        try {
-            // map jar entry names from jar file
-            var entryNames =
-                    ZipFileUtils.listEntriesFromArchive(jarFile, ".class")
-                            .stream()
-                            .collect(Collectors.toMap(
-                                    entry->org.codehaus.plexus.util.FileUtils.filename(entry.replace("/", File.separator)),
-                                    entry->entry));
-
-            // convert filenames to jar entry names
-            var entries = classes.stream().map(file -> {
-                String filename = org.codehaus.plexus.util.FileUtils.filename(file.getName());
-                return entryNames.get(filename);
-            }).collect(Collectors.toList());
-
-            List<String> result = JarUpdate.addFiles(jarFile, classes, entries);
-            return SuccessTip.create(result);
-
-        }catch (Exception e){
-            return ErrorTip.create(BusinessCode.Reserved);
-        }
+        return SuccessTip.create(deployedList);
     }
 
-
-    /**
-     * start to deploy the lib jar to standalone jar
-     *
-     * @param baseJar64 base64Encoded
-     * @param jar64     base64Encoded
-     * @return
-     */
-    @Deprecated
-    @PostMapping("/deploy/{baseJar64}/from/{jar64}")
-    @ApiOperation(value = "同步依赖装配lib.jar至应用standalone.jar")
-    public Tip mergeJars(@PathVariable("baseJar64") String baseJar64, @PathVariable("jar64") String jar64) throws IOException {
-        String baseJar = new String(Base64.getDecoder().decode(baseJar64));
-        String jar = new String(Base64.getDecoder().decode(jar64));
-
-        String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
-
-        File rootJarFile = new File(String.join(File.separator, rootPath, baseJar));
-        if (!rootJarFile.exists()) {
-            throw new BusinessException(BusinessCode.FileNotFound);
-        }
-        if (!rootJarFile.setReadable(true)) {
-            throw new BusinessException(BusinessCode.FileReadingError);
-        }
-        File jarFile = new File(String.join(File.separator, rootPath, jar));
-        if (!jarFile.exists()) {
-            throw new BusinessException(BusinessCode.FileNotFound);
-        }
-        File libFile = DepUtils.alignFileJarEntry(jarFile, rootJarFile);
-        if (!libFile.setReadable(true)) {
-            throw new BusinessException(BusinessCode.FileReadingError);
-        }
-        logger.info("libPath={}", libFile.getAbsolutePath());
-
-        // check dependencies
-        List<String> baseJarDependencies = DependencyUtils.getDependenciesByJar(rootJarFile);
-        List<String> libDependencies = DependencyUtils.getDependenciesByJar(libFile);
-        List<String> diffDependencies = DependencyUtils.getDifferentDependenciesIgnoreVersion(baseJarDependencies, libDependencies);
-
-        if (diffDependencies != null && diffDependencies.size() > 0) {
-            diffDependencies.forEach(u -> logger.debug("dependency= {}", u));
-            throw new BusinessException(BusinessCode.Reserved2, "依赖不匹配, 禁止更新jar!");
-        }
-
-        // allow inject
-        // just wait for cron to deploy the lib
-        ZipFileUtils.addFilesToZip(rootJarFile, new File[]{libFile});
-
-        return SuccessTip.create(libFile.getAbsolutePath().replace((new File(rootPath).getAbsolutePath() + File.separator), ""));
-    }
 
 
     /**

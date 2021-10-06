@@ -6,9 +6,11 @@ import com.google.common.io.Files;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.jar.dependency.DependencyUtils;
+import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
 import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import org.apache.commons.io.FileUtils;
+import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.util.Assert;
 
@@ -186,27 +188,20 @@ public class DepUtils {
 
 
     /**
-     *
-     * @param rootPath the root path
-     * @param dir  the jar location
-     * @param jar  the jar
-     * @param pattern  filter the file within jar
-     * @param target  extra files to
+     *  extra files from .jar file
+     * @param jarFile  the jar file to extra from
+     * @param entryExtension  the entry file extension, eg. .class, .jar etc.
+     * @param entryPattern  the entry file name which contains
+     * @param entryPattern  the target path where extra files to be
      * @return
      */
-    public static List<Map.Entry<String,Long>> extraFilesFromJar(String rootPath, String dir, String jar, String pattern, String target) throws IOException{
-        File rootJarFile = new File(String.join(File.separator, rootPath, dir, jar));
-
-        if(StringUtils.isNotEmpty(target)){
-            String targetPath = String.join(File.separator, rootPath, target);
-            if(!new File(targetPath).exists()){
-                org.codehaus.plexus.util.FileUtils.mkdir(targetPath);
-            }
+    public static List<Map.Entry<String,Long>> extraFilesFromJar(File jarFile, String entryExtension, String entryPattern, File targetPath) throws IOException{
+        if(!targetPath.exists()){
+            org.codehaus.plexus.util.FileUtils.mkdir(targetPath.getAbsolutePath());
         }
 
-        var checkums = ZipFileUtils.UnzipWithChecksum(rootJarFile, pattern, target);
+        var checkums = ZipFileUtils.UnzipWithChecksum(jarFile, entryExtension, entryPattern, targetPath);
 
-        StringUtils.trim(File.separator.toString());
         // remove rootPath from checksum
         return checkums.stream()
                 // remove rootPath
@@ -216,5 +211,60 @@ public class DepUtils {
                         entry.getValue()))
                 .sorted()
                 .collect(Collectors.toList());
+    }
+
+    public static List<String> deployFilesToJar(File dirPath, String fileExtension, String filePattern, File jarFile) throws IOException{
+        Assert.isTrue(dirPath.exists(), dirPath.getName() + " not exists!");
+
+        // dir/javaclass -> classes/javaname.class
+        // target to .jar
+        List<File> classes = new ArrayList<>();
+
+        if(StringUtils.isNotBlank(filePattern)){
+
+            File[] listOfFiles = dirPath.listFiles();
+            Stream.of(listOfFiles)
+                    .filter(f -> FilenameUtils.getExtension(f.getName()).equals(fileExtension))
+                    .filter(f -> f.getName().contains(filePattern))
+                    .map(
+                            f ->{
+                                return new File(String.join(File.separator, dirPath.getAbsolutePath(), f.getName()));
+                            }
+                    )
+                    .forEach(f->{
+                        classes.add(f);
+                    });
+        }
+
+        // update into zip/jar
+        //String result = ZipFileUtils.addFileToZip(jarFile, okClassFile);
+        //long crc32=Files.hash(okClassFile, Hashing.adler32()).padToLong();
+        //
+        // map jar entry names from jar file
+        String fileTypeExtension = "."+fileExtension; //=> ".class" or ".jar"
+        var entryNames =
+                ZipFileUtils.listEntriesFromArchive(jarFile, fileTypeExtension, filePattern)
+                        .stream()
+                        .collect(Collectors.toMap(
+                                entry->org.codehaus.plexus.util.FileUtils.filename(entry.replace("/", File.separator)),
+                                entry->entry));
+
+        // convert filenames to jar entry names
+        var entries = classes.stream().map(file -> {
+            String filename = org.codehaus.plexus.util.FileUtils.filename(file.getName());
+            return entryNames.get(filename);
+        }).collect(Collectors.toList());
+
+        return JarUpdate.addFiles(jarFile, classes, entries);
+    }
+
+
+    public static List<String> deployFilesToJarEntry(String rootPath, String dir, String fileExtension, String filePattern, File jarFile, String jarEntry) throws IOException {
+        Assert.isTrue(StringUtils.isNotBlank(jarEntry), "jar entry cannot be empty!");
+
+        List<Map.Entry<String,Long>> checksums =  DepUtils.extraFilesFromJar(jarFile, fileExtension, filePattern, deployTarget);
+
+        jarPath = String.join(File.separator, rootPath, checksums.get(0).getKey());
+        jarFile = new File(jarPath);
     }
 }

@@ -20,6 +20,10 @@ Content-Disposition: attachment; filename=test.jar
 data:attachment/jar;base64,dGVzdA==
 
 
+### 重启容器 (向docker socket发送重启指令)
+GET http://192.168.3.
+
+
 
 ### 查询根目录下的JAR
 //all: 是否显示所有文件

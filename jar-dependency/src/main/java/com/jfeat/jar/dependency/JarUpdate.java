@@ -14,6 +14,8 @@ import java.util.stream.Collectors;
 import java.util.zip.CRC32;
 import java.util.zip.ZipOutputStream;
 
+import static com.jfeat.jar.dependency.FileUtils.getRelativeFilePath;
+
 // https://www.developer.com/guides/accessing-zips-and-jars-using-java-part-2/
 // http://thornton.rosesquared.org/articles/ZipJar/part2.html
 
@@ -21,13 +23,13 @@ import java.util.zip.ZipOutputStream;
 
 public class JarUpdate {
 
-    public static String getRelativeFilePath(File baseFile, File file) {
-        String entryPath = FileUtils.dirname(file.getAbsolutePath())
-                .substring(FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
-
-        return String.join(File.separator, entryPath, FileUtils.filename(file.getAbsolutePath()))
-                .replace(File.separator, "/");
-    }
+//    public static String getRelativeFilePath(File baseFile, File file) {
+//        String entryPath = FileUtils.dirname(file.getAbsolutePath())
+//                .substring(FileUtils.dirname(baseFile.getAbsolutePath()).length() + 1);
+//
+//        return String.join(File.separator, entryPath, FileUtils.filename(file.getAbsolutePath()))
+//                .replace(File.separator, "/");
+//    }
 
 
     /**
@@ -37,12 +39,13 @@ public class JarUpdate {
         return addFiles(jarFile, inputFiles, new ArrayList<>());
     }
 
-    public static List<String> addFiles(File jarFile, List<File> inputFiles, List<String> entryNames) throws Exception {
+    public static List<String> addFiles(File jarFile, List<File> inputFiles, List<String> entryNames) throws IOException {
         //Assert.isTrue(inputFiles!=null && inputFiles.size()>0, "input files should not be empty !");
         if(entryNames.size()==0 || entryNames.size()==inputFiles.size()){
         }else{
-            throw new BadAttributeValueExpException("size of entryNames should be equal to inputFiles !");
+            throw new IOException("size of entryNames should be equal to inputFiles !");
         }
+
         // convert entryNames to map
         var entryNamesHash =
                 entryNames.stream()
