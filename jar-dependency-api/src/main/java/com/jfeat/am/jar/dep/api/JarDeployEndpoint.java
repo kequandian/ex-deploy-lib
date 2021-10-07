@@ -2,6 +2,7 @@ package com.jfeat.am.jar.dep.api;
 
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
 import com.jfeat.am.jar.dep.request.JarRequest;
+import com.jfeat.am.jar.dep.util.DecompileUtils;
 import com.jfeat.am.jar.dep.util.DepUtils;
 import com.jfeat.am.jar.dep.util.UploadUtils;
 import com.jfeat.crud.base.exception.BusinessCode;
@@ -47,6 +48,39 @@ public class JarDeployEndpoint {
 
     @Autowired
     private JarDeployProperties jarDeployProperties;
+
+    @PostMapping("/sugar/deploy")
+    @ApiOperation(value = "直接部署")
+    public Tip uploadJarFile(@RequestPart("file") MultipartFile jar) throws IOException {
+        String rootPath = jarDeployProperties.getRootPath();
+        File rootPathFile = new File(rootPath);
+        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+        Assert.isTrue(jar!=null && !jar.isEmpty(), "部署文件不能为空");
+
+        String libPath = "lib";
+        File libFilePath = new File(String.join(File.separator, rootPath, libPath));
+        File uploadedFile = UploadUtils.doMultipartFile(jar, String.join(File.separator, rootPath, libPath));
+
+        // find app.jar *-standalone.jar or *.war
+        File[] files = new File(rootPath).listFiles(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String name) {
+                if(name.equals("app.jar")) return true;
+                if(org.codehaus.plexus.util.FileUtils.extension(name).equals("war")) return true;
+                if(name.endsWith("-standalone.jar"))return true;
+                return false;
+            }
+        });
+        Assert.isTrue(files!=null && files.length==1, "Multi (or no) app jar found!");
+        File appFile = files[0];
+
+        // deploy lib
+        Assert.isTrue(jar.getOriginalFilename().equals(jar.getName()), "just for verify");
+        List<String> result = DepUtils.deployFilesToJar(libFilePath, "jar", jar.getOriginalFilename(), appFile);
+        Assert.isTrue(result.size()==1, "fail to deploy!");
+
+        return SuccessTip.create(result.get(0));
+    }
 
     @PostMapping("/jars/upload/{dir}")
     @ApiOperation(value = "发送.jar至指定目(支持base64格式)")
@@ -336,30 +370,19 @@ public class JarDeployEndpoint {
     @GetMapping("/decompile")
     @ApiOperation(value = "反编译指定的文件")
     public Tip decompileJarFile(@RequestParam(value = "dir", required = false) String dir,
+                                @RequestParam(value = "pattern", required = false) String pattern,
                                 @RequestParam(value = "jar", required = false) String jar,
                                 @RequestParam(value = "target", required = false) String target,
-                                @RequestParam(value = "pattern", required = false) String pattern,
-                                @RequestParam(value = "javaclass", required = false) String javaclass,
                                 @RequestParam(value = "empty", required = false) Boolean empty
     ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
-
         final String Dir =  dir==null?"":dir;
 
         List<String> files = null;
 
-        // javaclass -> p1
-        File javaclasFile = new File(String.join(File.separator, rootPath, Dir, javaclass));
-        if (javaclasFile.exists()) {
-            List<String> fileList = Stream.of(new String[]{javaclass}).collect(Collectors.toList());
-            files = fileList.stream().map(
-                    f -> String.join(File.separator, rootPath, Dir, f)
-            ).collect(Collectors.toList());
-
-        } else if (org.apache.commons.lang3.StringUtils.isNotBlank(jar)) {
-            // jar -> p2
-            //Assert.isTrue(org.apache.commons.lang3.StringUtils.isNotBlank(pattern), "pattern should be empty when decompile classes from jar !");
+        if (org.apache.commons.lang3.StringUtils.isNotBlank(jar)) {
+            // jar -> p1
 
             File jarFile = new File(String.join(File.separator, rootPath, Dir, jar));
             Assert.isTrue(jarFile.exists(), jar + " not exists!");
@@ -377,7 +400,7 @@ public class JarDeployEndpoint {
                     .collect(Collectors.toList());
 
         } else {
-            // dir -> p3
+            // dir -> p2
 
             File dirFile = new File(String.join(File.separator, rootPath, Dir));
             Assert.isTrue(dirFile.exists(), jar + " not exists!");
@@ -392,46 +415,8 @@ public class JarDeployEndpoint {
                     .collect(Collectors.toList());
         }
 
-        // decompile
-        final StringBuilder decompiles = new StringBuilder();
-        OutputSinkFactory.Sink println = line -> {
-            decompiles.append(line);
-            System.out.println(line);
-        };
-
-        OutputSinkFactory mySink = new OutputSinkFactory() {
-            @Override
-            public List<SinkClass> getSupportedSinks(SinkType sinkType, Collection<SinkClass> collection) {
-                // I only understand how to sink strings, regardless of what you have to give me.
-                return Collections.singletonList(SinkClass.STRING);
-            }
-
-            @Override
-            public <T> Sink<T> getSink(SinkType sinkType, SinkClass sinkClass) {
-                return sinkType == SinkType.JAVA ? println : ignore -> {
-                };
-            }
-        };
-
-        CfrDriver cfrDriver = new CfrDriver.Builder().withOutputSink(mySink).build();
-        //CfrDriver cfrDriver = (new CfrDriver.Builder()).build();
-        cfrDriver.analyse(files);
-
-        if (!(empty == null || !empty)) {
-            files.stream().forEach(
-                    filePath -> {
-                        org.codehaus.plexus.util.FileUtils.fileDelete(filePath);
-                        try {
-                            String dirname = org.codehaus.plexus.util.FileUtils.dirname(filePath);
-                            File dirFile = new File(dirname);
-                            if (dirFile.listFiles().length == 0) {
-                                org.codehaus.plexus.util.FileUtils.forceDelete(dirFile);
-                            }
-                        }catch (IOException e){
-                        }
-                    }
-            );
-        }
+        // start to decompile
+        String decompiles = DecompileUtils.decompileFiles(files, empty);
         return SuccessTip.create(decompiles);
     }
 
