@@ -177,4 +177,12 @@ public class FileUtils {
         }
         return filePath.replace(commonPath, "");
     }
+
+    public static String getCommonBasedir(String firstPath, String secondPath){
+        String commonPath = org.codehaus.plexus.util.FileUtils.dirname(secondPath);
+        while (!firstPath.startsWith(commonPath)){
+            commonPath = org.codehaus.plexus.util.FileUtils.dirname(commonPath);
+        }
+        return commonPath;
+    }
 }

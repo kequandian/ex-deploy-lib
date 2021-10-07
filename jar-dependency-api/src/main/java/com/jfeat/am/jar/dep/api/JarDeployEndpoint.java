@@ -6,11 +6,9 @@ import com.jfeat.am.jar.dep.util.DepUtils;
 import com.jfeat.am.jar.dep.util.UploadUtils;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
-import com.jfeat.crud.base.tips.ErrorTip;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.DependencyUtils;
-import com.jfeat.jar.dependency.JarUpdate;
 import com.jfeat.jar.dependency.ZipFileUtils;
 import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import io.swagger.annotations.Api;
@@ -231,7 +229,7 @@ public class JarDeployEndpoint {
         }
 
         // default to get file checksum in jar file
-        var checksums = ZipFileUtils.listEntriesWithChecksum(jarFile, pattern);
+        var checksums = ZipFileUtils.listEntriesWithChecksum(jarFile, "jar", pattern);
         return SuccessTip.create(checksums.stream()
                 .map(c->{
                     return new ChecksumKeyValue<String,Long>(c.getKey(), c.getValue());
@@ -272,8 +270,8 @@ public class JarDeployEndpoint {
 
         }else if(baseJarChecksum.size()==0 && jarChecksum.size()==0){
             // compare files
-            List<Map.Entry<String,Long>> baseJarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(baseJarFile, ".class");
-            List<Map.Entry<String,Long>> jarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(jarFile, ".class");
+            List<Map.Entry<String,Long>> baseJarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(baseJarFile, "class", "");
+            List<Map.Entry<String,Long>> jarEntryChecksum = ZipFileUtils.listEntriesWithChecksum(jarFile, "class", "");
             return SuccessTip.create(DependencyUtils.getDifferentChecksums(baseJarEntryChecksum, jarEntryChecksum));
 
         }else if(baseJarChecksum.size()>0 || jarChecksum.size()>0) {
@@ -314,7 +312,7 @@ public class JarDeployEndpoint {
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
-        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, pattern);
+        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, "", pattern);
         return SuccessTip.create(list);
     }
 
@@ -326,8 +324,12 @@ public class JarDeployEndpoint {
 
         // convert to target
         String absTarget = String.join(File.separator, rootPath, request.getTarget());
+        File targetFile = new File(absTarget);
 
-        var checksums =  DepUtils.extraFilesFromJar(rootPath, request.getDir(), request.getJar(), request.getPattern(), absTarget);
+        File jarFile = new File(String.join(File.separator, rootPath, request.getDir(), request.getJar()));
+        Assert.isTrue(jarFile.exists(), jarFile.getAbsolutePath()+" no exists !");
+
+        var checksums =  DepUtils.extraFilesFromJar(jarFile, "", request.getPattern(), targetFile);
         return SuccessTip.create(checksums);
     }
 
@@ -362,10 +364,11 @@ public class JarDeployEndpoint {
             File jarFile = new File(String.join(File.separator, rootPath, Dir, jar));
             Assert.isTrue(jarFile.exists(), jar + " not exists!");
             if (org.apache.commons.lang3.StringUtils.isBlank(pattern)) {
-                return SuccessTip.create(ZipFileUtils.listEntriesFromArchive(jarFile, pattern));
+                return SuccessTip.create(ZipFileUtils.listEntriesFromArchive(jarFile, "", pattern));
             }
 
-            var unzipFiles = ZipFileUtils.unzipFilesFromArchiva(jarFile, pattern, target);
+            File targetPath = new File(String.join(File.separator, rootPath, target));
+            var unzipFiles = ZipFileUtils.unzipFilesFromArchiva(jarFile, "", pattern, targetPath);
             files = unzipFiles.stream()
                     .filter(f -> FilenameUtils.getExtension(f).equals("class"))
                     .map(
@@ -434,7 +437,7 @@ public class JarDeployEndpoint {
 
 
     @PostMapping("/deploy/{type}")
-    @ApiOperation(value = "部署type类型(class)的文件")
+    @ApiOperation(value = "部署目录中指定type类型(如 .class)的文件")
     public Tip deployClasses(@RequestBody JarRequest request,
                              @PathVariable("type") String fileExtension) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
@@ -444,7 +447,10 @@ public class JarDeployEndpoint {
         File jarFile = new File(jarPath);
         Assert.isTrue(jarFile.exists(), jarFile.getAbsolutePath() + " not exists!");
 
-        var deployedList  =DepUtils.deployFilesToJar(rootPath, request.getDir(), fileExtension, request.getPattern(), jarFile);
+        File dirPath = new File(String.join(File.separator, rootPath, request.getDir()));
+        Assert.isTrue(dirPath.exists(), dirPath.getAbsolutePath() + " not exists!");
+
+        var deployedList  =DepUtils.deployFilesToJar(dirPath, fileExtension, request.getPattern(), jarFile);
         return SuccessTip.create(deployedList);
     }
 
@@ -455,11 +461,16 @@ public class JarDeployEndpoint {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
 
-        var deployedList  =DepUtils.deployFilesToJarEntry(request.getJar(), );
+        File dirPath = new File(String.join(File.separator, rootPath, request.getDir()));
+        Assert.isTrue(dirPath.exists(), dirPath.getAbsolutePath() + " not exists!");
+
+        File jarFile = new File(String.join(File.separator, rootPath, request.getTarget(), request.getJar()));
+
+        var deployedList  =DepUtils.deployFilesToJarEntry(dirPath, "class", request.getPattern(),
+                jarFile, request.getEntry());
 
         return SuccessTip.create(deployedList);
     }
-
 
 
     /**
@@ -490,7 +501,7 @@ public class JarDeployEndpoint {
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
         Assert.isTrue(rootJarFile.exists(), jarFileName + " not exists !");
 
-        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, pattern);
+        var list = ZipFileUtils.listEntriesFromArchive(rootJarFile, "class", pattern);
         // clean up all indexing files first
         if(recreate){
             list.stream().forEach(entry -> {
@@ -507,7 +518,7 @@ public class JarDeployEndpoint {
         // create indexes files
         String jarFilename = rootJarFile.getName();
         list.stream()
-                .filter(f->org.codehaus.plexus.util.FileUtils.extension(f).equals("class"))
+                //.filter(f->org.codehaus.plexus.util.FileUtils.extension(f).equals("class"))
                 .map(key->{
             Map.Entry<String,String> entry = Map.entry(key, jarFilename);
             return entry;

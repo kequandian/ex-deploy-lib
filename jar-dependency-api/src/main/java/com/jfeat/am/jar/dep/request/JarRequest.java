@@ -18,6 +18,11 @@ public class JarRequest {
      */
     private String target;
 
+    /**
+     * the entry name within the jar file
+     */
+    private String entry;
+
 
     public String getTarget() {
         return target==null?"":target;
@@ -49,5 +54,13 @@ public class JarRequest {
 
     public void setDir(String dir) {
         this.dir = dir;
+    }
+
+    public String getEntry() {
+        return entry;
+    }
+
+    public void setEntry(String entry) {
+        this.entry = entry;
     }
 }

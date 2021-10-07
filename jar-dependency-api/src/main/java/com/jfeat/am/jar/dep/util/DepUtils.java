@@ -155,7 +155,7 @@ public class DepUtils {
 
         // locate file with jar
         String filename = org.codehaus.plexus.util.FileUtils.filename(deployingFile.getName());
-        var query = ZipFileUtils.listEntriesFromArchive(jarFile, filename);
+        var query = ZipFileUtils.listEntriesFromArchive(jarFile, "", filename);
         Assert.isTrue(query.size()==1, "fail to find deploying file within jar:" + filename);
         String targetFilename = query.get(0);
 
@@ -201,12 +201,13 @@ public class DepUtils {
         }
 
         var checkums = ZipFileUtils.UnzipWithChecksum(jarFile, entryExtension, entryPattern, targetPath);
+        String commonBasedir = com.jfeat.jar.dependency.FileUtils.getCommonBasedir(jarFile.getAbsolutePath(), targetPath.getAbsolutePath());
 
         // remove rootPath from checksum
         return checkums.stream()
                 // remove rootPath
                 .map(entry->new ChecksumKeyValue<String,Long>(
-                        StringUtils.stripStart(entry.getKey().replace(rootPath, ""), File.separator)
+                        StringUtils.stripStart(entry.getKey().replace(commonBasedir, ""), File.separator)
                         ,
                         entry.getValue()))
                 .sorted()
@@ -259,12 +260,20 @@ public class DepUtils {
     }
 
 
-    public static List<String> deployFilesToJarEntry(String rootPath, String dir, String fileExtension, String filePattern, File jarFile, String jarEntry) throws IOException {
-        Assert.isTrue(StringUtils.isNotBlank(jarEntry), "jar entry cannot be empty!");
+    public static List<String> deployFilesToJarEntry(File dirPath, String fileExtension, String filePattern, File jarFile, String jarEntryPattern) throws IOException {
+        Assert.isTrue(StringUtils.isNotBlank(jarEntryPattern), "jar entry cannot be empty!");
 
-        List<Map.Entry<String,Long>> checksums =  DepUtils.extraFilesFromJar(jarFile, fileExtension, filePattern, deployTarget);
+        String libDir = "lib";
+        String basedir = com.jfeat.jar.dependency.FileUtils.getCommonBasedir(dirPath.getAbsolutePath(), jarFile.getAbsolutePath());
+        File entryPath = new File(String.join(File.separator, basedir, libDir));
 
-        jarPath = String.join(File.separator, rootPath, checksums.get(0).getKey());
-        jarFile = new File(jarPath);
+        List<Map.Entry<String,Long>> checksums =  DepUtils.extraFilesFromJar(jarFile, "jar", jarEntryPattern, entryPath);
+        Assert.isTrue(checksums.size()==1, "multi (or no) jar entries found, should be unique!");
+
+        File entryFile = new File(String.join(File.separator, checksums.get(0).getKey()));
+
+        var sink = deployFilesToJar(dirPath, fileExtension, filePattern, entryFile);
+
+        return deployFilesToJar(entryPath, "jar", jarEntryPattern, jarFile);
     }
 }
