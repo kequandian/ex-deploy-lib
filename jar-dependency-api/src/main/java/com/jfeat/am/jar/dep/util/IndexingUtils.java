@@ -14,16 +14,14 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class IndexingUtils {
-    public static List<String> indexingJarFile(File jarFile, String entryExtension, String entryPattern, File indexesPath) throws IOException{
+    public static List<String> indexingJarFile(File jarFile, String entryExtension, String entryPattern, File indexesPath, boolean recreate) throws IOException{
         if(!indexesPath.exists()) {
             org.codehaus.plexus.util.FileUtils.mkdir(indexesPath.getAbsolutePath());
         }
 
         List<String> indexes = ZipFileUtils.listEntriesFromArchive(jarFile, entryExtension, entryPattern);
 
-
         // clean up all indexing files first
-        boolean recreate = true; // always true
         if(recreate){
             indexes.stream().forEach(entry -> {
                 String firstLetter = String.valueOf(org.codehaus.plexus.util.FileUtils.filename(entry.replace("/",File.separator)).charAt(0)).toLowerCase();
