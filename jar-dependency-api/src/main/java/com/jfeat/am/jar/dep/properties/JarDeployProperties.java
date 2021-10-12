@@ -17,9 +17,19 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "jarDependency")
 public class JarDeployProperties {
     /**
-     * 应用路径
+     * 容器内应用路径
      */
     String rootPath;
+
+    /**
+     * 容器名称/ID
+     */
+    String container;
+
+    /**
+     * Docker API endpoint
+     */
+    String dockerApiEndpoint;
 
     /**
      *  用于初始化数据库的路径
@@ -31,6 +41,18 @@ public class JarDeployProperties {
     }
     public void setRootPath(String rootPath){
         this.rootPath = rootPath;
+    }
+    public String getDockerApiEndpoint(){
+        return this.dockerApiEndpoint;
+    }
+    public void setDockerApiEndpoint(String endpoint){
+        this.dockerApiEndpoint = endpoint;
+    }
+    public String getContainer(){
+        return this.container;
+    }
+    public void setContainer(String container){
+        this.container = container;
     }
     public String getFlywayPath(){
         return this.flywayPath;

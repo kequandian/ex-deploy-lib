@@ -31,4 +31,6 @@ spring:
 
 jar-dependency:
    root-path: jar-dependency-api/target
+   container: biliya-api
+   docker-api-endpoint: 192.168.3.204:2375
    
