@@ -1,19 +1,13 @@
 package com.jfeat.am.jar.dep.api;
 
 import com.jfeat.am.jar.dep.properties.JarDeployProperties;
-import com.jfeat.am.jar.dep.request.JarRequest;
 import com.jfeat.am.jar.dep.util.DecompileUtils;
-import com.jfeat.am.jar.dep.util.DepUtils;
+import com.jfeat.am.jar.dep.util.IndexingUtils;
 import com.jfeat.am.jar.dep.util.UploadUtils;
-import com.jfeat.crud.base.exception.BusinessCode;
-import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
-import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.ZipFileUtils;
-import com.jfeat.jar.dependency.comparable.ChecksumKeyValue;
 import io.swagger.annotations.Api;
-import io.swagger.annotations.ApiImplicitParam;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.ApiParam;
 import org.apache.commons.io.FilenameUtils;
@@ -27,14 +21,11 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.ServletOutputStream;
-import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * 依赖处理接口
@@ -50,6 +41,52 @@ public class IndexingJarDeployEndpoint {
 
     @Autowired
     private JarDeployProperties jarDeployProperties;
+
+    @GetMapping("/indexing")
+    @ApiOperation(value = "创建索引用于自动部署.class/.jar")
+    public Tip indexingJarFile(@RequestParam(value = "jar") String fatJar,
+                               @ApiParam("在fat jar中匹配要创建其Entry索引的.jar文件") @RequestParam(value = "pattern", required = false) String pattern)
+    throws IOException{
+        String rootPath = jarDeployProperties.getRootPath();
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        String defaultLibPath  = "lib";
+        String defaultIndexesPath = "indexes";
+
+        File fatJarFile = new File(String.join(File.separator, rootPath, fatJar));
+        Assert.isTrue(fatJarFile.exists(), fatJarFile.getName() + " not exists !");
+        File targetIndexesPath = new File(String.join(File.separator, rootPath, defaultIndexesPath));
+
+        // 如果pattern为空，仅显示文件列表, 不进行索引
+        if(StringUtils.isBlank(pattern)) {
+            SuccessTip.create(ZipFileUtils.listEntriesFromArchive(fatJarFile, "", ""));
+        }
+
+        /// start to indexing
+        List<String> allIndexes = new ArrayList<>();
+
+        // 1. indexing all files from fat jarFile first
+        List<String> fatJarIndexes = IndexingUtils.indexingJarFile(fatJarFile, "", "", targetIndexesPath);
+        allIndexes.addAll(fatJarIndexes);
+
+        // 2. indexing jar pattern within fat jar
+        // get jar entries first
+        File defaultLibPathFile = new File(String.join(File.separator, rootPath, defaultLibPath));
+        if(!defaultLibPathFile.exists()){
+            org.codehaus.plexus.util.FileUtils.mkdir(defaultLibPathFile.getAbsolutePath());
+        }
+
+
+        // match jar files with pattern
+        List<String> patternJars = ZipFileUtils.unzipFilesFromArchiva(fatJarFile, "jar", pattern, defaultLibPathFile);
+        for(String jar : patternJars){
+            // indexing all .class files
+            var jarIndexes = IndexingUtils.indexingJarFile(new File(jar), "class", "", targetIndexesPath);
+            allIndexes.addAll(jarIndexes);
+        }
+
+        return SuccessTip.create(allIndexes);
+    }
+
 
     @PostMapping("/deploy")
     @ApiOperation(value = "直接部署.class/.jar文件")
@@ -85,7 +122,6 @@ public class IndexingJarDeployEndpoint {
         return SuccessTip.create(deployedPath);
     }
 
-
     @GetMapping("/decompile")
     @ApiOperation(value = "反编译指定的文件(pattern空,即显示jar所有文件")
     public Tip decompileJarFile(@RequestParam(value = "jar") String jar,
@@ -99,6 +135,9 @@ public class IndexingJarDeployEndpoint {
         List<String> files = null;
         File jarFile = new File(String.join(File.separator, rootPath, jar));
         Assert.isTrue(jarFile.exists(), jar + " not exists!");
+
+        //TODO, decompile .class file in .jar within fat jar.
+
 
         // show all files is pattern is empty
         if (org.apache.commons.lang3.StringUtils.isBlank(pattern)) {
