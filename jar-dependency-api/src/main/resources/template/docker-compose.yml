@@ -1,0 +1,35 @@
+version: "3.4"
+services:
+  dummy:
+    image: arm32v7/api:dummy
+    container_name: dummy-api
+    privileged: true
+    restart: always
+    working_dir: /webapps
+    ports:
+      - 6000:8080
+    environment:
+      ROLLBACK_KEEP_NUM: 2
+      DUMMY_RUNNER: test   # means --spring.profiles.active=test, no mysql required
+      # DUMMY_URL: 192.168.3.239:3306/dummy  # for dummy itself
+      #GREENFIELD: dummy
+      # URL_SHORT: 192.168.3.239:3306/dummy
+      # USERNAME: root
+      # PASSWORD: root
+#      DEPLOY_OPT: dummy  # dummy: deploy only, restart container
+#      DOCKER_SOCKET: /var/run/docker.sock
+#      DOCKER_ENDPOINT: 172.18.0.1:2375
+#      DOCKER_CONTAINER: biliya-api
+    volumes:
+      # - /var/run/docker.sock:/var/run/docker.sock
+      - /etc/localtime:/etc/localtime:ro
+#      - /home/pi/workspace/crud-app-starter/pom-dev-standalone/docker/tag/api+dev-standalone/script/entrypoint.sh:/usr/local/bin/entrypoint.sh
+#      - /home/pi/workspace/crud-app-starter/pom-dev-standalone/docker/tag/api+dev-standalone/script/deploy.sh:/usr/local/bin/deploy.sh
+#      - /home/pi/workspace/crud-app-starter/pom-dev-standalone/docker/tag/api+dev-standalone/script/deploy-lib.sh:/usr/local/bin/deploy-lib.sh
+#      - /home/pi/workspace/crud-app-starter/pom-dev-standalone/docker/tag/api+dev-standalone/script/deploy-classes.sh:/usr/local/bin/deploy-classes.sh
+#      - /home/pi/workspace/crud-app-starter/pom-dev-standalone/docker/target/dev-standalone-1.0.0-standalone.jar:/usr/local/dummy/app.jar
+      - ./api:/webapps
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "2m"

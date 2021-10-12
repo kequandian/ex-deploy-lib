@@ -5,18 +5,19 @@ import org.benf.cfr.reader.api.OutputSinkFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
 public class DecompileUtils {
-    public static String decompileFiles(List<String> files, Boolean forceClean){
+    public static List<String> decompileFiles(List<String> files, Boolean forceClean){
         if(forceClean==null) forceClean = false;
 
         // decompile
-        final StringBuilder lines = new StringBuilder();
+        final List<String> lines = new ArrayList<>();
         OutputSinkFactory.Sink println = line -> {
-            lines.append(line);
+            lines.add(line.toString());
             System.out.println(line);
         };
 
@@ -54,6 +55,6 @@ public class DecompileUtils {
             );
         }
 
-        return lines.toString();
+        return lines;
     }
 }

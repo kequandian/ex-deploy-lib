@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -48,39 +49,6 @@ public class JarDeployEndpoint {
 
     @Autowired
     private JarDeployProperties jarDeployProperties;
-
-    @PostMapping("/sugar/deploy")
-    @ApiOperation(value = "直接部署")
-    public Tip uploadJarFile(@RequestPart("file") MultipartFile jar) throws IOException {
-        String rootPath = jarDeployProperties.getRootPath();
-        File rootPathFile = new File(rootPath);
-        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
-        Assert.isTrue(jar!=null && !jar.isEmpty(), "部署文件不能为空");
-
-        String libPath = "lib";
-        File libFilePath = new File(String.join(File.separator, rootPath, libPath));
-        File uploadedFile = UploadUtils.doMultipartFile(jar, String.join(File.separator, rootPath, libPath));
-
-        // find app.jar *-standalone.jar or *.war
-        File[] files = new File(rootPath).listFiles(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String name) {
-                if(name.equals("app.jar")) return true;
-                if(org.codehaus.plexus.util.FileUtils.extension(name).equals("war")) return true;
-                if(name.endsWith("-standalone.jar"))return true;
-                return false;
-            }
-        });
-        Assert.isTrue(files!=null && files.length==1, "Multi (or no) app jar found!");
-        File appFile = files[0];
-
-        // deploy lib
-        Assert.isTrue(jar.getOriginalFilename().equals(jar.getName()), "just for verify");
-        List<String> result = DepUtils.deployFilesToJar(libFilePath, "jar", jar.getOriginalFilename(), appFile);
-        Assert.isTrue(result.size()==1, "fail to deploy!");
-
-        return SuccessTip.create(result.get(0));
-    }
 
     @PostMapping("/jars/upload/{dir}")
     @ApiOperation(value = "发送.jar至指定目(支持base64格式)")
@@ -372,8 +340,7 @@ public class JarDeployEndpoint {
     public Tip decompileJarFile(@RequestParam(value = "dir", required = false) String dir,
                                 @RequestParam(value = "pattern", required = false) String pattern,
                                 @RequestParam(value = "jar", required = false) String jar,
-                                @RequestParam(value = "target", required = false) String target,
-                                @RequestParam(value = "empty", required = false) Boolean empty
+                                @RequestParam(value = "target", required = false) String target
     ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
@@ -416,8 +383,8 @@ public class JarDeployEndpoint {
         }
 
         // start to decompile
-        String decompiles = DecompileUtils.decompileFiles(files, empty);
-        return SuccessTip.create(decompiles);
+        List<String> decompiles = DecompileUtils.decompileFiles(files, true);
+        return SuccessTip.create(decompiles.size());
     }
 
 
