@@ -22,6 +22,6 @@ public class Base64Test{
         String baseJar = new String(Base64.getDecoder().decode(baseJar64));
         logger.info(baseJar);
 
-        Assert.isTrue("jar-deploy-api-1.0.0-standalone.jar".equals(baseJar));
+        Assert.isTrue("jar-dependency-api-1.0.0-standalone.jar".equals(baseJar));
     }
 }

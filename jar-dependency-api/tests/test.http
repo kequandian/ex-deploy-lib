@@ -181,9 +181,9 @@ Content-Disposition: form-data; name="file"
 
 title
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB
-Content-Disposition: attachment; name="file"; filename="jar-deploy-api-1.0.0.jar"
+Content-Disposition: attachment; name="file"; filename="jar-dependency-api-1.0.0.jar"
 
-< ./target/jar-deploy-api-1.0.0.jar
+< ./target/jar-dependency-api-1.0.0.jar
 ------WebKitFormBoundaryAFRaG58f2nIb0mPB--
 ### inspect jar
 GET {{endpoint}}/api/jar/dep/inspect
@@ -227,9 +227,9 @@ Content-Type: application/json
 ### 注入
 ### baseJar 不支持[.jar],需转换为BASE64
 //POST {{endpoint}}/api/jar/deploy/to/{baseJar}/from/{jar}
-// jar-deploy-api-1.0.0-standalone.jar
+// jar-dependency-api-1.0.0-standalone.jar
 //  BASE64 Encode: amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=
-// lib/jar-deploy-api-1.0.0.jar
+// lib/jar-dependency-api-1.0.0.jar
 //  BASE64 Encode: bGliL2phci1kZXBsb3ktYXBpLTEuMC4wLmphcg==
 //
 POST {{endpoint}}/api/jar/deploy/to/amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=/from/bGliL2phci1kZXBsb3ktYXBpLTEuMC4wLmphcg==

@@ -53,9 +53,9 @@ public class IndexingJarDeployEndpoint {
     @ApiOperation(value = "重启容器")
     public Tip restartContainer() throws IOException {
         String endpoint = jarDeployProperties.getDockerApiEndpoint();
-        Assert.isTrue(StringUtils.isNotBlank(endpoint), "jar-deploy:docker-api-endpoint: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(endpoint), "jar-dependency:docker-api-endpoint: 没有配置！");
         String container = jarDeployProperties.getContainer();
-        Assert.isTrue(StringUtils.isNotBlank(container), "jar-deploy:container: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(container), "jar-dependency:container: 没有配置！");
 
         // send restart event
         RestTemplate restTemplate = new RestTemplate();
@@ -84,7 +84,7 @@ public class IndexingJarDeployEndpoint {
                                @RequestParam(value = "action", required = false) String action)
     throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         String defaultLibPath  = "lib";
         String defaultIndexesPath = "indexes";
 
@@ -141,7 +141,7 @@ public class IndexingJarDeployEndpoint {
     public Tip uploadJarFile(@RequestPart("file") MultipartFile jarOrClass) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
-        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+        Assert.isTrue(rootPathFile.exists(), "jar-dependency:root-path: 配置项不存在！");
         Assert.isTrue(jarOrClass!=null && !jarOrClass.isEmpty(), "部署文件不能为空");
         String fileType = FileUtils.extension(jarOrClass.getOriginalFilename());
         Assert.isTrue(fileType.equals("class") || fileType.equals("jar"), "only support .class or .jar !");
@@ -177,7 +177,7 @@ public class IndexingJarDeployEndpoint {
                                 HttpServletResponse response
     ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         String classesPath = "classes";
 
         List<String> files = null;

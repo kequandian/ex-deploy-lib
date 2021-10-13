@@ -57,7 +57,7 @@ public class JarDeployEndpoint {
         if(dir==null) dir="";
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
-        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+        Assert.isTrue(rootPathFile.exists(), "jar-dependency:root-path: 配置项不存在！");
 
         File uploadedFile = null;
         if(file!=null && !file.isEmpty()) {
@@ -80,7 +80,7 @@ public class JarDeployEndpoint {
         if(dir==null) dir="";
         String rootPath = jarDeployProperties.getRootPath();
         File rootPathFile = new File(rootPath);
-        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+        Assert.isTrue(rootPathFile.exists(), "jar-dependency:root-path: 配置项不存在！");
 
         File uploadedFile = UploadUtils.doBase64File(request, String.join(File.separator, rootPath, dir));
 
@@ -101,12 +101,12 @@ public class JarDeployEndpoint {
                        @RequestParam(value = "all", required = false) Boolean all
                        ) {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         String Dir = dir==null?"":dir;
         Boolean All = all==null? false : all;
 
         File rootPathFile = new File(rootPath);
-        Assert.isTrue(rootPathFile.exists(), "jar-deploy:root-path: 配置项不存在！");
+        Assert.isTrue(rootPathFile.exists(), "jar-dependency:root-path: 配置项不存在！");
 
         File subPathFile = new File(String.join(File.separator, rootPath, Dir));
         ArrayList<String> filesArray = new ArrayList<>();
@@ -140,7 +140,7 @@ public class JarDeployEndpoint {
                                     @RequestParam(value = "dir", required = false) String dir,
                                     @RequestParam(name = "pattern", required = false) String pattern) {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         if(dir==null) dir="";
 
         File jarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
@@ -169,7 +169,7 @@ public class JarDeployEndpoint {
                             @RequestParam(value = "major", required = false) boolean major
     ) {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         List<String> diffDependencies = DepUtils.getMismatchJars(rootPath, baseJar, jar, major);
         if (diffDependencies != null && diffDependencies.size() > 0) {
@@ -185,7 +185,7 @@ public class JarDeployEndpoint {
                          @ApiParam(name = "major", value = "仅匹配库名,不匹配版本号")
                          @RequestParam(value = "major", required = false) boolean major) {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         if (major) {
             return SuccessTip.create(DepUtils.getMatchJars(rootPath, baseJar, jar, true));
@@ -201,7 +201,7 @@ public class JarDeployEndpoint {
                             @RequestParam(value = "type", required = false) String type,
                             @RequestParam(name = "pattern", required = false) String pattern) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         if(dir==null){ dir=""; }
 
         File jarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
@@ -246,7 +246,7 @@ public class JarDeployEndpoint {
     public Tip checksumMismatchJars(@RequestParam("baseJar") String baseJar,
                                     @RequestParam("jar") String jar) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         File baseJarFile = new File(String.join(File.separator, rootPath, baseJar));
         if (!baseJarFile.exists()) {
@@ -308,7 +308,7 @@ public class JarDeployEndpoint {
                             @RequestParam("jar") String jarFileName,
                             @RequestParam(name = "pattern", required = false) String pattern) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         if(dir==null) dir="";
 
         File rootJarFile = new File(String.join(File.separator, rootPath, dir, jarFileName));
@@ -322,7 +322,7 @@ public class JarDeployEndpoint {
     @ApiOperation(value = "从.jar中解压匹配文件至指定目录")
     public Tip downloadJarFile(@RequestBody JarRequest request) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         // convert to target
         String absTarget = String.join(File.separator, rootPath, request.getTarget());
@@ -343,7 +343,7 @@ public class JarDeployEndpoint {
                                 @RequestParam(value = "target", required = false) String target
     ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         final String Dir =  dir==null?"":dir;
 
         List<String> files = null;
@@ -393,7 +393,7 @@ public class JarDeployEndpoint {
     public Tip deployClasses(@RequestBody JarRequest request,
                              @PathVariable("type") String fileExtension) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         String jarPath = String.join(File.separator, rootPath, request.getTarget(),  request.getJar());
         File jarFile = new File(jarPath);
@@ -411,7 +411,7 @@ public class JarDeployEndpoint {
     @ApiOperation(value = "仅部署")
     public Tip compileJarFile(@RequestBody JarRequest request) throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
 
         File dirPath = new File(String.join(File.separator, rootPath, request.getDir()));
         Assert.isTrue(dirPath.exists(), dirPath.getAbsolutePath() + " not exists!");
@@ -438,7 +438,7 @@ public class JarDeployEndpoint {
                                 @RequestParam(name = "recreate", required = false) Boolean recreate
                                 ) throws IOException {
         String rootPath = jarDeployProperties.getRootPath();
-        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
+        Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-dependency:root-path: 没有配置！");
         if(dir==null) dir="";
         if(recreate==null) recreate=false;
 
