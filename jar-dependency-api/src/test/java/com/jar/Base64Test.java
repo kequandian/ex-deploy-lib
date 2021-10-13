@@ -17,8 +17,7 @@ public class Base64Test{
         String str=  "\\myString.java";
         String res = StringUtils.stripStart(str, File.separator);
 
-
-        String baseJar64 = "amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=";
+        String baseJar64 = "amFyLWRlcGVuZGVuY3ktYXBpLTEuMC4wLXN0YW5kYWxvbmUuamFy";
         String baseJar = new String(Base64.getDecoder().decode(baseJar64));
         logger.info(baseJar);
 
