@@ -4,6 +4,8 @@ import com.jfeat.am.jar.dep.properties.JarDeployProperties;
 import com.jfeat.am.jar.dep.util.DecompileUtils;
 import com.jfeat.am.jar.dep.util.IndexingUtils;
 import com.jfeat.am.jar.dep.util.UploadUtils;
+import com.jfeat.crud.base.exception.BusinessCode;
+import com.jfeat.crud.base.tips.ErrorTip;
 import com.jfeat.crud.base.tips.SuccessTip;
 import com.jfeat.crud.base.tips.Tip;
 import com.jfeat.jar.dependency.ZipFileUtils;
@@ -16,13 +18,17 @@ import org.codehaus.plexus.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.ServletOutputStream;
 import javax.servlet.http.HttpServletResponse;
 import java.io.*;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -41,6 +47,32 @@ public class IndexingJarDeployEndpoint {
 
     @Autowired
     private JarDeployProperties jarDeployProperties;
+
+    @GetMapping("/restart")
+    @ApiOperation(value = "重启容器")
+    public Tip restartContainer() throws IOException {
+        String endpoint = jarDeployProperties.getDockerApiEndpoint();
+        Assert.isTrue(StringUtils.isNotBlank(endpoint), "jar-deploy:docker-api-endpoint: 没有配置！");
+        String container = jarDeployProperties.getContainer();
+        Assert.isTrue(StringUtils.isNotBlank(container), "jar-deploy:container: 没有配置！");
+
+        // send restart event
+        RestTemplate restTemplate = new RestTemplate();
+
+        final String api = String.join("/", "/containers", container, "restart");
+        final String baseUrl = endpoint + api;
+        URI uri = null;
+        try {
+            uri = new URI(baseUrl);
+            ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
+            return SuccessTip.create(result);
+
+        } catch (URISyntaxException e) {
+            e.printStackTrace();
+        }
+
+        return ErrorTip.create(BusinessCode.Reserved);
+    }
 
     @GetMapping("/indexing")
     @ApiOperation(value = "创建索引用于自动部署.class/.jar")
