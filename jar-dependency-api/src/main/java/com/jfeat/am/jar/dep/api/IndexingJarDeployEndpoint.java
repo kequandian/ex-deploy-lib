@@ -55,7 +55,7 @@ public class IndexingJarDeployEndpoint {
     @Autowired
     private JarDeployProperties jarDeployProperties;
 
-    @GetMapping("/restart")
+    @PostMapping("/restart")
     @ApiOperation(value = "重启容器")
     public Tip restartContainer() throws IOException {
         String endpoint = jarDeployProperties.getDockerApiEndpoint();

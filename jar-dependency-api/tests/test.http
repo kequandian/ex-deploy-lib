@@ -234,3 +234,22 @@ Content-Type: application/json
 //
 POST {{endpoint}}/api/jar/deploy/to/amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=/from/bGliL2phci1kZXBsb3ktYXBpLTEuMC4wLmphcg==
 Content-Type: application/json
+
+### 直接部署.class/.jar文件(swagger提交失败)
+POST {{endpoint}}/api/jar/dep/sugar/deploy
+Content-Type: multipart/form-data; boundary=WebKitFormBoundaryAFRaG58f2nIb0mPB
+
+--WebKitFormBoundaryAFRaG58f2nIb0mPB
+Content-Disposition: form-data; name=file; filename=jar-dependency-api-1.0.0.jar
+
+< ../target/jar-dependency-api-1.0.0.jar
+--WebKitFormBoundaryAFRaG58f2nIb0mPB--
+
+
+### 反编译指定的文件pattern空,即显示jar所有文件
+GET {{endpoint}}/api/jar/dep/sugar/decompile
+?jar=jar-dependency-api-1.0.0.jar
+&pattern=
+
+### 重启容器 (向docker socket发送重启指令)
+POST {{endpoint}}/api/jar/dep/sugar/restart
