@@ -235,7 +235,7 @@ Content-Type: application/json
 POST {{endpoint}}/api/jar/deploy/to/amFyLWRlcGxveS1hcGktMS4wLjAtc3RhbmRhbG9uZS5qYXI=/from/bGliL2phci1kZXBsb3ktYXBpLTEuMC4wLmphcg==
 Content-Type: application/json
 
-### 直接部署.class/.jar文件
+### 直接部署.class/.jar文件(swagger提交失败)
 POST {{endpoint}}/api/jar/dep/sugar/deploy
 Content-Type: multipart/form-data; boundary=WebKitFormBoundaryAFRaG58f2nIb0mPB
 
