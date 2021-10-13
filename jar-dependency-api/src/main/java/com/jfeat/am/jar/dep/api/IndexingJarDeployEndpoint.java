@@ -32,6 +32,7 @@ import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * 依赖处理接口
@@ -77,12 +78,19 @@ public class IndexingJarDeployEndpoint {
     @GetMapping("/indexing")
     @ApiOperation(value = "创建索引用于自动部署.class/.jar")
     public Tip indexingJarFile(@RequestParam(value = "jar") String fatJar,
-                               @ApiParam("在fat jar中匹配要创建其Entry索引的.jar文件") @RequestParam(value = "pattern", required = false) String pattern)
+                               @ApiParam("在fat jar中匹配要创建其Entry索引的.jar文件")
+                               @RequestParam(value = "pattern", required = false) String pattern,
+                               @ApiParam("reset:清空, recreate: 重新构建, append: 增加")
+                               @RequestParam(value = "action", required = false) String action)
     throws IOException{
         String rootPath = jarDeployProperties.getRootPath();
         Assert.isTrue(StringUtils.isNotBlank(rootPath), "jar-deploy:root-path: 没有配置！");
         String defaultLibPath  = "lib";
         String defaultIndexesPath = "indexes";
+
+        final String RESET="reset", RECREATE="recreate", APPEND="append";
+        Assert.isTrue(StringUtils.isBlank(action) || Stream.of(new String[]{RESET,RECREATE,APPEND}).collect(Collectors.toList()).contains(action),
+                "action should be one of [reset, recreate, append]");
 
         File fatJarFile = new File(String.join(File.separator, rootPath, fatJar));
         Assert.isTrue(fatJarFile.exists(), fatJarFile.getName() + " not exists !");
@@ -96,24 +104,32 @@ public class IndexingJarDeployEndpoint {
         /// start to indexing
         List<String> allIndexes = new ArrayList<>();
 
-        // 1. indexing all files from fat jarFile first
-        List<String> fatJarIndexes = IndexingUtils.indexingJarFile(fatJarFile, "", "", targetIndexesPath);
-        allIndexes.addAll(fatJarIndexes);
+        if(RESET.equals(action)){
+            targetIndexesPath.deleteOnExit();
+        }else if(RECREATE.equals(action)){
+            targetIndexesPath.deleteOnExit();
+            targetIndexesPath.mkdir();
 
-        // 2. indexing jar pattern within fat jar
-        // get jar entries first
-        File defaultLibPathFile = new File(String.join(File.separator, rootPath, defaultLibPath));
-        if(!defaultLibPathFile.exists()){
-            org.codehaus.plexus.util.FileUtils.mkdir(defaultLibPathFile.getAbsolutePath());
+            // 1. indexing all files from fat jarFile first
+            List<String> fatJarIndexes = IndexingUtils.indexingJarFile(fatJarFile, "", "", targetIndexesPath, false);
+            allIndexes.addAll(fatJarIndexes);
         }
 
+        if(RECREATE.equals(action)||APPEND.equals(action)) {
 
-        // match jar files with pattern
-        List<String> patternJars = ZipFileUtils.unzipFilesFromArchiva(fatJarFile, "jar", pattern, defaultLibPathFile);
-        for(String jar : patternJars){
-            // indexing all .class files
-            var jarIndexes = IndexingUtils.indexingJarFile(new File(jar), "class", "", targetIndexesPath);
-            allIndexes.addAll(jarIndexes);
+            // 2. indexing jar pattern within fat jar
+            // get jar entries first
+            File defaultLibPathFile = new File(String.join(File.separator, rootPath, defaultLibPath));
+            if (!defaultLibPathFile.exists()) {
+                org.codehaus.plexus.util.FileUtils.mkdir(defaultLibPathFile.getAbsolutePath());
+            }
+            // match jar files with pattern
+            List<String> patternJars = ZipFileUtils.unzipFilesFromArchiva(fatJarFile, "jar", pattern, defaultLibPathFile);
+            for (String jar : patternJars) {
+                // indexing all .class files
+                var jarIndexes = IndexingUtils.indexingJarFile(new File(jar), "class", "", targetIndexesPath, false);
+                allIndexes.addAll(jarIndexes);
+            }
         }
 
         return SuccessTip.create(allIndexes);
