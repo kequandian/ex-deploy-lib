@@ -42,7 +42,7 @@ import java.util.stream.Stream;
  * @date 2020-08-05
  */
 @RestController
-@Api("/api/jar/dep")
+@Api("api-jar-dep")
 @RequestMapping("/api/jar/dep")
 public class JarDeployEndpoint {
     protected final static Logger logger = LoggerFactory.getLogger(JarDeployEndpoint.class);

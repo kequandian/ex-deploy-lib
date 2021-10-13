@@ -18,8 +18,13 @@ import org.codehaus.plexus.util.FileUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +35,7 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -41,7 +47,7 @@ import java.util.stream.Stream;
  * @date 2020-08-05
  */
 @RestController
-@Api("/api/jar/dep")
+@Api("api-jar-dep-sugar")
 @RequestMapping("/api/jar/dep/sugar")
 public class IndexingJarDeployEndpoint {
     protected final static Logger logger = LoggerFactory.getLogger(IndexingJarDeployEndpoint.class);
@@ -65,7 +71,16 @@ public class IndexingJarDeployEndpoint {
         URI uri = null;
         try {
             uri = new URI(baseUrl);
-            ResponseEntity<String> result = restTemplate.getForEntity(uri, String.class);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+//            MultiValueMap<String, String> map= new LinkedMultiValueMap<>();
+//            map.add("email", "first.last@example.com");
+//            HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
+            HttpEntity<Object> request = new HttpEntity<>(headers);
+
+            ResponseEntity<Object> result = restTemplate.postForEntity(uri, request, Object.class);
+//            Object result = restTemplate.postForObject(uri, request, Object.class);
             return SuccessTip.create(result);
 
         } catch (URISyntaxException e) {
