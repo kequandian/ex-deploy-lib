@@ -1,5 +1,9 @@
 package com.jfeat.jar.dependency;
 
+import com.google.common.hash.HashCode;
+import com.google.common.hash.Hashing;
+import com.google.common.io.Files;
+import org.apache.commons.cli.*;
 import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.util.FileUtils;
 
@@ -17,14 +21,63 @@ import static com.jfeat.jar.dependency.FileUtils.getRelativeFilePath;
 
 public class ZipFileUtils {
 
-    public static void main(String[] args) throws Exception {
-        String lib = "dependency-cli/lib/test.jar";
-        File libFile = new File(lib);
+    public static void main(String[] args) throws IOException {
+        /**
+         * e.g.
+         * java -cp target/jar-dependency.jar com.jfeat.jar.dependency.ZipFileUtils -f -c target/jar-dependency.jar -p ZipFileUtils -e class
+         */
+        Options options = new Options();
 
-        List<Map.Entry<String,Long>> checksums = UnzipWithChecksum(libFile);
-        checksums.stream().forEach(x -> {
-            System.out.println(x.toString());
-        });
+        Option checksumOpt = new Option("c", "checksum", false, "get file checksum");
+        checksumOpt.setRequired(true);
+        options.addOption(checksumOpt);
+
+        Option fatjarOpt = new Option("f", "fatjar", false, "whether file is fatjar");
+        fatjarOpt.setRequired(false);
+        options.addOption(fatjarOpt);
+
+        Option filterExtOpt = new Option("e", "extension", true, "filter of entry extensions");
+        filterExtOpt.setRequired(false);
+        options.addOption(filterExtOpt);
+        Option filterPatternOpt = new Option("p", "pattern", true, "filter of entry pattern");
+        filterPatternOpt.setRequired(false);
+        options.addOption(filterPatternOpt);
+
+
+        CommandLineParser parser = new DefaultParser();
+        HelpFormatter formatter = new HelpFormatter();
+        CommandLine cmd = null;//not a good practice, it serves it purpose
+
+        try {
+            cmd = parser.parse(options, args);
+            if(cmd.getArgList().size()==0){
+                throw new ParseException("no arg!");
+            }
+        } catch (ParseException e) {
+            System.out.println(e.getMessage());
+            formatter.printHelp("jar-dependency [OPTIONS] <checksum-file>", options);
+
+            System.exit(1);
+        }
+
+        if(cmd.hasOption("c") && !cmd.hasOption("f")) {
+            String filePath = cmd.getArgs()[0];
+            File libFile = new File(filePath);
+            var checksum = getFileChecksumCode(libFile, "adler32");
+            System.out.println(checksum.padToLong());
+
+        }else if(cmd.hasOption("c") && cmd.hasOption("f")){
+            String fatjarPath = cmd.getArgs()[0];
+            File fatjarFile = new File(fatjarPath);
+
+            String extension =  cmd.hasOption("e") ? cmd.getOptionValue("e") : "";
+            String pattern =  cmd.hasOption("p") ? cmd.getOptionValue("p") : "";
+
+            var checksums = listEntriesWithChecksum(fatjarFile, extension, pattern);
+            checksums.stream().forEach(
+                    p->System.out.println(String.join(":", p.getKey(),String.valueOf(p.getValue())))
+            );
+        }
     }
 
     /**
@@ -251,9 +304,9 @@ public class ZipFileUtils {
         Path path = Paths.get("test.zip");
         URI uri = URI.create("jar:" + path.toUri());
 
-        try (FileSystem fs = FileSystems.newFileSystem(uri, env)) {
+        try (java.nio.file.FileSystem fs = FileSystems.newFileSystem(uri, env)) {
             Path nf = fs.getPath("new.txt");
-            try (Writer writer = Files.newBufferedWriter(nf, StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
+            try (Writer writer = java.nio.file.Files.newBufferedWriter(nf, StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
                 writer.write("hello");
             }
         }
@@ -342,12 +395,12 @@ public class ZipFileUtils {
         env.put("create", "true");
         URI uri = URI.create("jar:file:/codeSamples/zipfs/zipfstest.zip");
 
-        try (FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
+        try (java.nio.file.FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
             Path externalTxtFile = Paths.get("/codeSamples/zipfs/SomeTextFile.txt");
             Path pathInZipfile = zipfs.getPath("/SomeTextFile.txt");
 
             // copy a file into the zip file
-            Files.copy(externalTxtFile, pathInZipfile,
+            java.nio.file.Files.copy(externalTxtFile, pathInZipfile,
                     StandardCopyOption.REPLACE_EXISTING);
         }
     }
@@ -364,4 +417,54 @@ public class ZipFileUtils {
         }
         zf.close();
     }
+
+
+    /**
+     * get single file checksum
+     * @param file
+     * @param hashCode
+     * @return
+     * @throws IOException
+     */
+    public static long getFileChecksumAsLong(File file, String hashCode) throws IOException{
+        return getFileChecksumCode(file, hashCode).padToLong();
+    }
+    public static String getFileChecksum(File file, String hashCode) throws IOException{
+        return getFileChecksumCode(file, hashCode).toString();
+    }
+    public static HashCode getFileChecksumCode(File file, String hashCode) throws IOException{
+        HashCode checksumCode =  HashCode.fromInt(0);
+        if(StringUtils.isNotEmpty(hashCode)) {
+            final String[] supportedType  =new String[]{"adler32","crc32","crc32c","md5","sha1","sha256","sha512"};
+            //Assertions.assertThat(Stream.of(supportedType).collect(Collectors.toList()).contains(hashCode));
+
+            switch (hashCode) {
+                case "adler32":
+                    checksumCode = Files.hash(file, Hashing.adler32());
+                    break;
+                case "crc32":
+                    checksumCode = Files.hash(file, Hashing.crc32());
+                    break;
+                case "crc32c":
+                    checksumCode = Files.hash(file, Hashing.crc32c());
+                    break;
+                case "md5":
+                    checksumCode = Files.hash(file, Hashing.md5());
+                    break;
+                case "sha1":
+                    checksumCode = Files.hash(file, Hashing.sha1());
+                    break;
+                case "sha256":
+                    checksumCode = Files.hash(file, Hashing.sha256());
+                    break;
+                case "sha512":
+                    checksumCode = Files.hash(file, Hashing.sha512());
+                    break;
+                default:
+                    break;
+            }
+        }
+        return checksumCode;
+    }
+
 }

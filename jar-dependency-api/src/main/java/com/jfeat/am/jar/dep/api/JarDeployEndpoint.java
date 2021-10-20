@@ -34,6 +34,7 @@ import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
+import java.util.zip.ZipFile;
 
 /**
  * 依赖处理接口
@@ -226,8 +227,8 @@ public class JarDeployEndpoint {
                     "supported type: " + String.join(",", supportedType));
 
             return SuccessTip.create(Map.entry("checksum", type.endsWith("l") ?
-                    DepUtils.getFileChecksumAsLong(jarFile, type) :
-                    DepUtils.getFileChecksum(jarFile, type)));
+                    ZipFileUtils.getFileChecksumAsLong(jarFile, type) :
+                    ZipFileUtils.getFileChecksum(jarFile, type)));
         }
 
         // default to get file checksum in jar file
@@ -293,7 +294,7 @@ public class JarDeployEndpoint {
             Assert.isTrue(query.size()<=1, "multi match within: " + baseJar);
             String commonKey = query.get(0).getKey();
 
-            var entry = Map.entry(commonKey, DepUtils.getFileChecksumAsLong(JarFile, "adler32"));
+            var entry = Map.entry(commonKey, ZipFileUtils.getFileChecksumAsLong(JarFile, "adler32"));
             list.add(entry);
             return SuccessTip.create(DependencyUtils.getDifferentChecksums(BaseJarChecksum, list));
         }

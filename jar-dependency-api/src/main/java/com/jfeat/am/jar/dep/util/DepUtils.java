@@ -1,8 +1,5 @@
 package com.jfeat.am.jar.dep.util;
 
-import com.google.common.hash.HashCode;
-import com.google.common.hash.Hashing;
-import com.google.common.io.Files;
 import com.jfeat.crud.base.exception.BusinessCode;
 import com.jfeat.crud.base.exception.BusinessException;
 import com.jfeat.jar.dependency.DependencyUtils;
@@ -93,54 +90,6 @@ public class DepUtils {
 
     private static String getFullPathname(File jarFile){
         return String.join(File.separator, org.codehaus.plexus.util.FileUtils.dirname(jarFile.getAbsolutePath()), org.codehaus.plexus.util.FileUtils.filename(jarFile.getAbsolutePath()));
-    }
-
-    /**
-     * get single file checksum
-     * @param file
-     * @param hashCode
-     * @return
-     * @throws IOException
-     */
-    public static long getFileChecksumAsLong(File file, String hashCode) throws IOException{
-        return getFileChecksumCode(file, hashCode).padToLong();
-    }
-    public static String getFileChecksum(File file, String hashCode) throws IOException{
-        return getFileChecksumCode(file, hashCode).toString();
-    }
-    public static HashCode getFileChecksumCode(File file, String hashCode) throws IOException{
-        HashCode checksumCode = Files.hash(file, Hashing.md5());
-        if(StringUtils.isNotEmpty(hashCode)) {
-            final String[] supportedType  =new String[]{"adler32","crc32","crc32c","md5","sha1","sha256","sha512"};
-            Assert.isTrue(Stream.of(supportedType).collect(Collectors.toList()).contains(hashCode),
-                    "supported type: " + String.join(",", supportedType));
-            switch (hashCode) {
-                case "adler32":
-                    checksumCode = Files.hash(file, Hashing.adler32());
-                    break;
-                case "crc32":
-                    checksumCode = Files.hash(file, Hashing.crc32());
-                    break;
-                case "crc32c":
-                    checksumCode = Files.hash(file, Hashing.crc32c());
-                    break;
-                case "md5":
-                    checksumCode = Files.hash(file, Hashing.md5());
-                    break;
-                case "sha1":
-                    checksumCode = Files.hash(file, Hashing.sha1());
-                    break;
-                case "sha256":
-                    checksumCode = Files.hash(file, Hashing.sha256());
-                    break;
-                case "sha512":
-                    checksumCode = Files.hash(file, Hashing.sha512());
-                    break;
-                default:
-                    break;
-            }
-        }
-        return checksumCode;
     }
 
     /**
