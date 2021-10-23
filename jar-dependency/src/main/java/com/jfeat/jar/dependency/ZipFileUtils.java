@@ -426,12 +426,6 @@ public class ZipFileUtils {
      * @return
      * @throws IOException
      */
-    public static long getFileChecksumAsLong(File file, String hashCode) throws IOException{
-        return getFileChecksumCode(file, hashCode).padToLong();
-    }
-    public static String getFileChecksum(File file, String hashCode) throws IOException{
-        return getFileChecksumCode(file, hashCode).toString();
-    }
     public static HashCode getFileChecksumCode(File file, String hashCode) throws IOException{
         HashCode checksumCode =  HashCode.fromInt(0);
         if(StringUtils.isNotEmpty(hashCode)) {
@@ -466,5 +460,7 @@ public class ZipFileUtils {
         }
         return checksumCode;
     }
-
+    public static String getFileChecksum(File file, String hashCode) throws IOException{
+        return getFileChecksumCode(file, hashCode).toString();
+    }
 }

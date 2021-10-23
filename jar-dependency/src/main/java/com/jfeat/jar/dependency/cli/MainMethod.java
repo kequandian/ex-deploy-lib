@@ -1,177 +1,197 @@
 package com.jfeat.jar.dependency.cli;
 
-import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
-import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jfeat.jar.dependency.DependencyUtils;
-import com.jfeat.jar.dependency.FileUtils;
+import com.jfeat.jar.dependency.ZipFileUtils;
+import org.apache.commons.cli.*;
+import org.codehaus.plexus.util.FileUtils;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Properties;
-
-import static java.util.function.Predicate.not;
 
 /**
  * @author zxchengb
  * @date 2020-08-05
+ *
  */
 public class MainMethod {
-    /**
-     * JSON输出标识
-     */
-    private static final String JSON_FLAG = "j";
-    /**
-     * mismatch only 输出标识
-     */
-    private static final String MISMATCH_FLAG = "m";
+    // TODO, checksum
 
     /**
-     * 对比标识
+     * Dependency list
+     *
+     * @param args
      */
-    private static final String COMPARE_REGEX = "^-[c][mj]*?$";
+    private static final String PARSE_OPTION = "p";
     /**
-     * 解析标识
+     * 输出为JSON
      */
-    private static final String PARSE_REGEX = "^-[p][j]?$";
+    private static final String JSON_OPTION = "j";
     /**
-     * 版本标识
+     * 同时进行 checksum 比较
      */
-    private static final String VERSION_REGEX = "^-v$";
-    /**
-     * 选项正则表达式
-     */
-    private static final String OPTION_REGEX = "^-[c][mj]*?$|^-[p](j)?$|^-[v]$";
+    private static final String CHECKSUM_OPTION = "s";
 
-    public static void Help(){
-        System.out.println(
-        "Usage: dependency [Options] [.jar ...]\n" +
-        "  e.g. dependency -p ./lib/test.jar\n" +
-        "\n" +
-        "Options:\n" +
-        "-c, --compare </path/to/module1> </path/to/module2>  Compare two jar module\n" +
-        "-m, --mismatch </path/to/module1> </path/to/module2>  Compare two jar module, only mismatch ones\n" +
-        "-j, --json     print out by json format\n" +
-        "-p, --parse </path/to/the-app.jar> [...]  parse jar dependencies and print out\n" +
-        "-v, --version  print out version info"
-        );
-    }
+
+    /**
+     * 比较两个JAR
+     */
+    private static final String COMPARE_OPTION = "c";
+
+    /**s
+     * 输出相同项，默认输出不同项
+     */
+    private static final String MATCH_OPTION = "m";
+    /**s
+     * 输出不相同项 （左不同项)
+     */
+    private static final String LEFT_DIFF_OPTION = "l";
+    /**s
+     * 输出不相同项 （右不同项)
+     */
+    private static final String RIGHT_DIFF_OPTION = "r";
+
 
     public static void main(String[] args) {
-        //  -d  --download  <groupId:artifactId:Version>
-        if (args.length == 0) {
-            Help();
-            return;
-        }
+        Options options = new Options();
 
-        String option = args[0];
-        if (option != null && !option.isBlank() && option.matches(OPTION_REGEX)) {
+        Option dependencyOpt = new Option(PARSE_OPTION, "parse", false, "parse and print the dependencies");
+        dependencyOpt.setRequired(false);
+        options.addOption(dependencyOpt);
 
-            if (option.matches(COMPARE_REGEX)) {
-                if(args.length >= 3) {
-                    String module1 = args[1];
-                    String module2=  args[2];
-                    compare(module1, module2, option);
-                }else{
-                    Help();
+        Option checksumOpt = new Option(CHECKSUM_OPTION, "checksum", false, "with checksum");
+        checksumOpt.setRequired(false);
+        options.addOption(checksumOpt);
+        Option jsonOpt = new Option(JSON_OPTION, "json", false, "output as json format");
+        jsonOpt.setRequired(false);
+        options.addOption(jsonOpt);
+
+        Option fatjarOpt = new Option(COMPARE_OPTION, "compare", false, "compare two jars, mismatch from left");
+        fatjarOpt.setRequired(false);
+        options.addOption(fatjarOpt);
+        Option rightMisOpt = new Option(RIGHT_DIFF_OPTION, "right", false, "mismatch from right");
+        rightMisOpt.setRequired(false);
+        options.addOption(rightMisOpt);
+        Option matchOpt = new Option(MATCH_OPTION, "match", false, "compare matches");
+        matchOpt.setRequired(false);
+        options.addOption(matchOpt);
+
+        CommandLineParser parser = new DefaultParser();
+        HelpFormatter formatter = new HelpFormatter();
+        CommandLine cmd = null;//not a good practice, it serves it purpose
+        File jar1=null, jar2=null;
+        try {
+            cmd = parser.parse(options, args);
+            if (cmd.getArgList().size() == 0) {
+                throw new ParseException("no arg!");
+            }
+
+            if (cmd.hasOption(PARSE_OPTION)) {
+                if (cmd.getArgList().size() < 1) {
+                    throw new ParseException("require 1 jars to get dependency !");
                 }
-            } else if (option.matches(PARSE_REGEX) && args.length >= 2) {
-                if (option.contains(JSON_FLAG)) {
-                    Arrays.stream(args).skip(1).forEach(s -> {
-                        JSONObject jsonObject = new JSONObject();
-                        jsonObject.put(s.substring(s.lastIndexOf('/')+1), parse(s));
-                        System.out.println(JSONObject.toJSONString(jsonObject, SerializerFeature.PrettyFormat));
-                    });
-                } else {
-                    Arrays.stream(args).skip(1).forEach(
-                            s -> parse(s)
-                                    .stream()
-                                    .takeWhile(not(String::isBlank))
-                                    .forEach(System.out::println));
-                }
-            } else if (option.matches(VERSION_REGEX)) {
-                Properties properties = FileUtils.getProperties();
-                if (properties != null) {
-                    System.err.println(properties.getProperty("app.version"));
+                String jar1arg = cmd.getArgs()[0];
+                jar1 = new File(jar1arg);
+                if(!jar1.exists()){
+                    throw new ParseException(" not exits !");
                 }
             }
 
-        }else{
-            Help();
-        }
-    }
+            if (cmd.hasOption(COMPARE_OPTION)) {
+                if (cmd.getArgList().size() < 2) {
+                    throw new ParseException("require 2 jars to compare !");
+                }
+                String jar1arg = cmd.getArgs()[0];
+                String jar2arg = cmd.getArgs()[1];
 
-    /**
-     * 根据JAR包路径解析并生成依赖结果
-     *
-     * @param filePath 目标JAR包路径
-     */
-    private static List<String> parse(String filePath) {
-        File jarFile = new File(filePath);
-        if (jarFile.exists() && jarFile.isFile()) {
-
-            List<String> dependencies = DependencyUtils.getDependencies(filePath);
-            if (dependencies != null && !dependencies.isEmpty()) {
-                return dependencies;
-            } else {
-                System.err.println("NOT Found Dependency JAR file.");
+                jar1 = new File(jar1arg);
+                jar2 = new File(jar2arg);
+                if(!jar1.exists()){
+                    throw new ParseException(jar1arg + " not exits !");
+                }
+                if(!jar2.exists()){
+                    throw new ParseException(jar2arg + " not exits !");
+                }
             }
+
+        } catch (ParseException e) {
+            System.out.println(e.getMessage());
+            formatter.printHelp("jar-dependency [OPTIONS] <jars...>", options);
+
+            System.exit(1);
+        }
+
+        // 获取依赖
+        if (cmd.hasOption(PARSE_OPTION)) {
+            List<String> d1 = cmd.hasOption(CHECKSUM_OPTION)?getChecksumDependencies(jar1)
+                    : DependencyUtils.getDependenciesByJar(jar1);
+            printOut(d1, cmd.hasOption(JSON_OPTION));
+
         } else {
-            System.err.println("NOT Found JAR File: " + filePath);
+            List<String> result = new ArrayList<>();
+
+            if (cmd.hasOption(COMPARE_OPTION)) {
+                List<String> d1 = cmd.hasOption(CHECKSUM_OPTION)? getChecksumDependencies(jar1) : DependencyUtils.getDependenciesByJar(jar1);
+                List<String> d2 = cmd.hasOption(CHECKSUM_OPTION)? getChecksumDependencies(jar2) : DependencyUtils.getDependenciesByJar(jar2);
+
+                if (d1.isEmpty()) { d1.add(cmd.hasOption(CHECKSUM_OPTION)? jarToEntryWithChecksum(jar1.getAbsolutePath()) : jarToEntry(jar1.getAbsolutePath())); }
+                if (d2.isEmpty()) { d2.add(cmd.hasOption(CHECKSUM_OPTION)? jarToEntryWithChecksum(jar2.getAbsolutePath()) : jarToEntry(jar1.getAbsolutePath())); }
+
+                if(cmd.hasOption(MATCH_OPTION)) {
+                    result.addAll(DependencyUtils.getSameDependencies(d1, d2));
+                }else if(cmd.hasOption(RIGHT_DIFF_OPTION)){
+                    // mismatch from right
+                    result.addAll(DependencyUtils.getDifferentDependencies(d2, d1));
+                }else{
+                    // default mismatch
+                    result.addAll(DependencyUtils.getDifferentDependencies(d1, d2));
+                }
+            }
+            printOut(result, cmd.hasOption(JSON_OPTION));
         }
-        return new ArrayList<>();
     }
 
-    /**
-     * 根据两个Maven module查找对应的依赖并将对比结果输出为JSON文件
-     *
-     * @param module_1 目标模块1
-     * @param module_2 目标模块2
-     */
-    private static void compare(String module_1, String module_2, String option) {
-        if (option.matches(COMPARE_REGEX)) {
-            List<String> d1 = DependencyUtils.getDependencies(module_1);
-            List<String> d2 = DependencyUtils.getDependencies(module_2);
-            if (!d1.isEmpty() && !d2.isEmpty()) {
-                final List<String> sameDependencies = DependencyUtils.getSameDependencies(d1, d2);
-                final List<String> leftDifferentDependencies = DependencyUtils.getDifferentDependencies(d1, d2);
-
-                if (option.contains(JSON_FLAG)) {
-
-                    if(option.contains(MISMATCH_FLAG)){
-                        JSONArray array = new JSONArray();
-                        System.out.println(JSON.toJSONString(array, SerializerFeature.PrettyFormat));
-                    }else {
-                        JSONObject jsonObject = new JSONObject();
-                        jsonObject.put("matches", sameDependencies);
-                        jsonObject.put("mismatches", leftDifferentDependencies);
-                        //jsonObject.put(rightName, rightDifferentDependencies);
-                        System.out.println(JSON.toJSONString(jsonObject, SerializerFeature.PrettyFormat));
-                    }
-
-                } else {
-                    if(option.contains(MISMATCH_FLAG)) {
-                        if (!leftDifferentDependencies.isEmpty()) {
-                            leftDifferentDependencies.forEach(s -> System.out.println("\t" + s));
-                        }
-                    }else{
-                        if (!sameDependencies.isEmpty()) {
-                            System.out.println("matches");
-                            sameDependencies.forEach(s -> System.out.println("\t\t\t" + s));
-                        }
-                        if (!leftDifferentDependencies.isEmpty()) {
-                            System.out.println("mismatches");
-                            leftDifferentDependencies.forEach(s -> System.out.println("\t\t\t" + s));
-                        }
-                    }
-                }
-
-            } else {
-                System.err.println("ERROR.");
-            }
+    private static List<String> getChecksumDependencies(File jarFile) {
+        List<String> d1 = new ArrayList<>();
+        try {
+            var checksums = ZipFileUtils.listEntriesWithChecksum(jarFile, "jar", "");
+            checksums.stream().forEach(
+                    p -> d1.add(java.lang.String.join("@", p.getKey(), java.lang.String.valueOf(p.getValue())))
+            );
+        } catch (Exception e) {
         }
+        return d1;
+    }
+
+    private static void printOut(List<String> result, boolean jsonFormat){
+        if (jsonFormat) {
+            System.out.println(
+                    JSONArray.toJSONString(result, SerializerFeature.PrettyFormat)
+            );
+        } else {
+            result.stream().forEach(
+                    p->System.out.println(p)
+            );
+        }
+    }
+
+    private static String jarToEntry(String jarPath){
+        if(FileUtils.extension(jarPath).equals("jar")){
+            return String.join("", "BOOT-INF/lib/", FileUtils.filename(jarPath));
+        }else if(FileUtils.extension(jarPath).equals("war")){
+            return String.join("", "WEB-INF/lib/", FileUtils.filename(jarPath));
+        }
+        return FileUtils.basename(jarPath);
+    }
+    private static String jarToEntryWithChecksum(String jarPath){
+        String entry = jarToEntry(jarPath);
+        try {
+            return String.join("@", entry, String.valueOf(ZipFileUtils.getFileChecksumCode(new File(jarPath), "adler32").padToLong()));
+        }catch (IOException e){
+        }
+        return entry;
     }
 }

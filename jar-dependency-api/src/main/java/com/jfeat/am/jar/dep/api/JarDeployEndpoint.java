@@ -227,7 +227,7 @@ public class JarDeployEndpoint {
                     "supported type: " + String.join(",", supportedType));
 
             return SuccessTip.create(Map.entry("checksum", type.endsWith("l") ?
-                    ZipFileUtils.getFileChecksumAsLong(jarFile, type) :
+                    ZipFileUtils.getFileChecksumCode(jarFile, type).padToLong() :
                     ZipFileUtils.getFileChecksum(jarFile, type)));
         }
 
@@ -294,7 +294,7 @@ public class JarDeployEndpoint {
             Assert.isTrue(query.size()<=1, "multi match within: " + baseJar);
             String commonKey = query.get(0).getKey();
 
-            var entry = Map.entry(commonKey, ZipFileUtils.getFileChecksumAsLong(JarFile, "adler32"));
+            var entry = Map.entry(commonKey, ZipFileUtils.getFileChecksumCode(JarFile, "adler32").padToLong());
             list.add(entry);
             return SuccessTip.create(DependencyUtils.getDifferentChecksums(BaseJarChecksum, list));
         }

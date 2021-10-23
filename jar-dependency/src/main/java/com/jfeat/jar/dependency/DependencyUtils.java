@@ -89,9 +89,9 @@ public class DependencyUtils {
             names.stream()
                     .filter(s -> s.endsWith(JAR_SUFFIX))
                     .collect(Collectors.toCollection(() -> dependencies));
-            if (dependencies.isEmpty()) {
-                return getDependenciesByPomModel(FileUtils.getPomModelByJar(jarFile));
-            }
+            //if (dependencies.isEmpty()) {
+            //    return getDependenciesByPomModel(FileUtils.getPomModelByJar(jarFile));
+            //}
             return dependencies;
         } catch (IOException e) {
             e.printStackTrace();
