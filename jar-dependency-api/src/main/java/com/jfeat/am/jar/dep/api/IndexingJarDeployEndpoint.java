@@ -23,8 +23,6 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.Assert;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
@@ -35,7 +33,6 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -134,12 +131,13 @@ public class IndexingJarDeployEndpoint {
 
             // 2. indexing jar pattern within fat jar
             // get jar entries first
-            File defaultLibPathFile = new File(String.join(File.separator, rootPath, defaultLibPath));
+            String defaultLibPathTo = String.join(File.separator, rootPath, defaultLibPath);
+            File defaultLibPathFile = new File(defaultLibPath);
             if (!defaultLibPathFile.exists()) {
                 org.codehaus.plexus.util.FileUtils.mkdir(defaultLibPathFile.getAbsolutePath());
             }
             // match jar files with pattern
-            List<String> patternJars = ZipFileUtils.unzipFilesFromArchiva(fatJarFile, "jar", pattern, defaultLibPathFile);
+            List<String> patternJars = ZipFileUtils.extraJarEntries(fatJarFile, "jar", pattern, defaultLibPathTo);
             for (String jar : patternJars) {
                 // indexing all .class files
                 var jarIndexes = IndexingUtils.indexingJarFile(new File(jar), "class", "", targetIndexesPath, false);
@@ -201,14 +199,13 @@ public class IndexingJarDeployEndpoint {
 
         //TODO, decompile .class file in .jar within fat jar.
 
-
         // show all files is pattern is empty
         if (org.apache.commons.lang3.StringUtils.isBlank(pattern)) {
             return SuccessTip.create(ZipFileUtils.listEntriesFromArchive(jarFile, "", pattern));
         }
 
-        File classesPathFile = new File(String.join(File.separator, rootPath, classesPath));
-        var unzipFiles = ZipFileUtils.unzipFilesFromArchiva(jarFile, "", pattern, classesPathFile);
+        String classPathTo = String.join(File.separator, rootPath, classesPath);
+        var unzipFiles = ZipFileUtils.extraJarEntries(jarFile, "", pattern, classPathTo);
         files = unzipFiles.stream()
                 .filter(f -> FilenameUtils.getExtension(f).equals("class"))
                 .map(

@@ -21,6 +21,7 @@ import static com.jfeat.jar.dependency.FileUtils.getRelativeFilePath;
 
 // http://www.java2s.com/example/java-api/java/util/zip/crc32/crc32-0-18.html
 
+@Deprecated
 public class JarUpdate {
 
 //    public static String getRelativeFilePath(File baseFile, File file) {

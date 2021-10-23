@@ -8,51 +8,103 @@ import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.util.FileUtils;
 
 import java.io.*;
-import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.*;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarFile;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import java.util.zip.*;
 
-import static com.jfeat.jar.dependency.FileUtils.getRelativeFilePath;
-
 public class ZipFileUtils {
+    /*
+        get checksum of file or entries in fatjar
+     */
+    private static String CHECKSUM_OPT = "s";
+    /*
+    List the table of contents for the archive
+     */
+    private static String LIST_OPT = "t";
+
+    /*
+     filter extension and pattern for entries
+     */
+    private static String EXTENSION_OPT = "e";
+    private static String PATTERN_OPT = "a";
+
+    /*
+     inspect file content
+     */
+    private static String INSPECT_ENTRY_OPT = "i";
+    /*
+    inspect Manifest
+     */
+    private static String INSPECT_MANIFEST_OPT = "m";
+    /*
+    inspect pom.xml
+     */
+    private static String INSPECT_POM_OPT = "o";
+    /*
+    inspect groupId
+     */
+    private static String INSPECT_GROUPID_OPT = "g";
+
+
 
     public static void main(String[] args) throws IOException {
         /**
          * e.g.
-         * java -cp target/jar-dependency.jar com.jfeat.jar.dependency.ZipFileUtils -f -c target/jar-dependency.jar -p ZipFileUtils -e class
+         * java -cp target/jar-dependency.jar com.jfeat.jar.dependency.ZipFileUtils target/jar-dependency.jar -s -p ZipFileUtils -e class
          */
         Options options = new Options();
 
-        Option checksumOpt = new Option("c", "checksum", false, "get file checksum");
-        checksumOpt.setRequired(true);
+        Option listOpt = new Option(LIST_OPT, "list", false, "List the table of contents for the archive");
+        listOpt.setRequired(false);
+        options.addOption(listOpt);
+
+        Option checksumOpt = new Option(CHECKSUM_OPT, "checksum", false, "get file checksum");
+        checksumOpt.setRequired(false);
         options.addOption(checksumOpt);
 
-        Option fatjarOpt = new Option("f", "fatjar", false, "whether file is fatjar");
-        fatjarOpt.setRequired(false);
-        options.addOption(fatjarOpt);
-
-        Option filterExtOpt = new Option("e", "extension", true, "filter of entry extensions");
+        Option filterExtOpt = new Option(EXTENSION_OPT, "extension", true, "filter of entry extensions");
         filterExtOpt.setRequired(false);
         options.addOption(filterExtOpt);
-        Option filterPatternOpt = new Option("p", "pattern", true, "filter of entry pattern");
+        Option filterPatternOpt = new Option(PATTERN_OPT, "pattern", true, "filter of entry pattern");
         filterPatternOpt.setRequired(false);
         options.addOption(filterPatternOpt);
 
+        Option inspectOpt = new Option(INSPECT_ENTRY_OPT, "inspect", true, "view file content");
+        inspectOpt.setRequired(false);
+        options.addOption(inspectOpt);
+
+        Option inspectManifestOpt = new Option(INSPECT_MANIFEST_OPT, "manifest", false, "view MANIFEST.MF content");
+        inspectManifestOpt.setRequired(false);
+        options.addOption(inspectManifestOpt);
+        Option inspectPomOpt = new Option(INSPECT_POM_OPT, "pom", false, "view dependency pom.xml content");
+        inspectPomOpt.setRequired(false);
+        options.addOption(inspectPomOpt);
+        Option inspectGroupIdOpt = new Option(INSPECT_GROUPID_OPT, "groupId", false, "get dependency groupId");
+        inspectGroupIdOpt.setRequired(false);
+        options.addOption(inspectGroupIdOpt);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
         CommandLine cmd = null;//not a good practice, it serves it purpose
+        File jarFile = null;
+        String jarEntry = null;
 
         try {
             cmd = parser.parse(options, args);
             if(cmd.getArgList().size()==0){
                 throw new ParseException("no arg!");
             }
+            jarEntry = cmd.getArgs()[0];
+            jarFile = new File(jarEntry);
+            if (!jarFile.exists()) {
+                throw new ParseException(jarFile.getName() + " not exist !");
+            }
+
         } catch (ParseException e) {
             System.out.println(e.getMessage());
             formatter.printHelp("jar-dependency [OPTIONS] <checksum-file>", options);
@@ -60,23 +112,38 @@ public class ZipFileUtils {
             System.exit(1);
         }
 
-        if(cmd.hasOption("c") && !cmd.hasOption("f")) {
+        if(cmd.hasOption(LIST_OPT)){
+            String extension =  cmd.hasOption(EXTENSION_OPT) ? cmd.getOptionValue(EXTENSION_OPT) : "";
+            String pattern =  cmd.hasOption(PATTERN_OPT) ? cmd.getOptionValue(PATTERN_OPT) : "";
+            listEntriesFromArchive(jarFile, extension, pattern).stream()
+                    .forEach(
+                    p->System.out.println(p)
+            );
+        }
+        else if(cmd.hasOption(CHECKSUM_OPT) && (cmd.hasOption(EXTENSION_OPT)||cmd.hasOption(PATTERN_OPT))){
+            // means fatjar, get entries
+            String extension =  cmd.hasOption(EXTENSION_OPT) ? cmd.getOptionValue(EXTENSION_OPT) : "";
+            String pattern =  cmd.hasOption(PATTERN_OPT) ? cmd.getOptionValue(PATTERN_OPT) : "";
+
+            var checksums = listEntriesWithChecksum(jarFile, extension, pattern);
+            checksums.stream().forEach(
+                    p->System.out.println(String.join("@", p.getKey(),String.valueOf(p.getValue())))
+            );
+        }else if(cmd.hasOption(CHECKSUM_OPT)) {
+            // get file checksum
             String filePath = cmd.getArgs()[0];
             File libFile = new File(filePath);
             var checksum = getFileChecksumCode(libFile, "adler32");
             System.out.println(checksum.padToLong());
 
-        }else if(cmd.hasOption("c") && cmd.hasOption("f")){
-            String fatjarPath = cmd.getArgs()[0];
-            File fatjarFile = new File(fatjarPath);
-
-            String extension =  cmd.hasOption("e") ? cmd.getOptionValue("e") : "";
-            String pattern =  cmd.hasOption("p") ? cmd.getOptionValue("p") : "";
-
-            var checksums = listEntriesWithChecksum(fatjarFile, extension, pattern);
-            checksums.stream().forEach(
-                    p->System.out.println(String.join(":", p.getKey(),String.valueOf(p.getValue())))
-            );
+        }else if(cmd.hasOption(INSPECT_ENTRY_OPT)){
+            System.out.println(getJarEntryPatternContent(jarFile, cmd.getOptionValue(INSPECT_ENTRY_OPT)));
+        }else if(cmd.hasOption(INSPECT_MANIFEST_OPT)){
+            System.out.println(getJarManifestContent(jarFile));
+        }else if(cmd.hasOption(INSPECT_POM_OPT)){
+            System.out.println(getJarPomContent(jarFile));
+        }else if(cmd.hasOption(INSPECT_GROUPID_OPT)){
+            System.out.println(getJarGroupId(jarFile));
         }
     }
 
@@ -109,72 +176,6 @@ public class ZipFileUtils {
             return entries;
         }
     }
-
-    /**
-     * 在jar文件中解压文件
-     * @param zipFile
-     * @param entryExtension 文件后缀类型过滤
-     * @param entryPattern 符合条件的搜索 （是否包含）
-     * @param targetPath  解压到目标目录
-     * @return
-     * @throws IOException
-     */
-    public static List<String> unzipFilesFromArchiva(File zipFile, String entryExtension, String entryPattern, File targetPath) throws IOException {
-        try (
-                InputStream zipStream = new FileInputStream(zipFile);
-                // Creating input stream that also maintains the checksum of
-                // the data which later can be used to validate data
-                // integrity.
-                CheckedInputStream cs =
-                        new CheckedInputStream(zipStream, new Adler32());
-                ZipInputStream zis =
-                        new ZipInputStream(new BufferedInputStream(cs))) {
-
-            // within try
-            ZipEntry entry = null;
-            List<String> files = new ArrayList<>();
-
-            // Read each entry from the ZipInputStream until no more entry
-            // found indicated by a null return value of the getNextEntry()
-            // method.
-            while ((entry = zis.getNextEntry()) != null) {
-                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(FileUtils.extension(entry.getName()))) &&
-                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
-                ) {
-                    long size = entry.getCrc();
-                    String relativePath = getRelativeFilePath(zipFile, targetPath);
-                    String filename = targetPath!=null? (String.join(File.separator, relativePath, FileUtils.filename(entry.getName()))) : entry.getName();
-
-                    if (size > 0) {
-                        String dirname = FileUtils.dirname(zipFile.getAbsolutePath());
-                        String entryFullName = String.join(File.separator,dirname, (targetPath!=null? filename: entry.getName()) );
-                        FileUtils.mkdir(FileUtils.dirname(entryFullName));
-
-                        byte[] buffer = new byte[1048];
-                        try (FileOutputStream fos =
-                                     new FileOutputStream(entryFullName);
-                             BufferedOutputStream bos =
-                                     new BufferedOutputStream(fos, buffer.length)) {
-
-                            while ((size = zis.read(buffer, 0, buffer.length)) != -1) {
-                                bos.write(buffer, 0, (int) size);
-                            }
-                            bos.flush();
-                        }
-                    }
-                    files.add(filename);
-                }
-            }
-
-            // Print out the checksum value
-            return files;
-        }
-    }
-
-    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile) throws IOException {
-        return UnzipWithChecksum(zipFile, "", "", null);
-    }
-
 
     /**
      * 在zipFile中获取匹配pattern文件的checksum信息并排序
@@ -216,208 +217,37 @@ public class ZipFileUtils {
     }
 
     /**
-     * 在zipFile中解压匹配pattern的文件
-     * @param zipFile
-     * @param entryExtension 文件后缀过滤条件
-     * @param entryPattern 包含此字符串的文件
-     * @param targetPath  解压到目标目录 (绝对路径)
-     * @return
-     * @throws IOException
+     * extra jar entry within jar
      */
-    public static List<Map.Entry<String,Long>> UnzipWithChecksum(File zipFile, String entryExtension, String entryPattern, File targetPath) throws IOException {
-        try (
-                InputStream zipStream = new FileInputStream(zipFile);
-                // Creating input stream that also maintains the checksum of
-                // the data which later can be used to validate data
-                // integrity.
-                CheckedInputStream cs =
-                        new CheckedInputStream(zipStream, new Adler32());
-                ZipInputStream zis =
-                        new ZipInputStream(new BufferedInputStream(cs))) {
+    public static List<String> extraJarEntries(File jarFile, String extension, String pattern, String destDir) {
+        List<String> entries = new ArrayList<>();
+        try(JarFile jar = new JarFile(jarFile)) {
+            Enumeration enumEntries = jar.entries();
+            while (enumEntries.hasMoreElements()) {
+                java.util.jar.JarEntry jarEntry = (java.util.jar.JarEntry) enumEntries.nextElement();
+                if((StringUtils.isBlank(extension) || FileUtils.extension(jarEntry.getName()).equals(extension)) &&
+                        StringUtils.isBlank(pattern) || jarEntry.getName().contains(pattern)) {
 
-            // within try
-            ZipEntry entry = null;
-            List<Map.Entry<String,Long>> checksums = new ArrayList<>();
+                    java.io.File f = new java.io.File(String.join(File.separator, destDir, jarEntry.getName()));
+                    if (jarEntry.isDirectory()) { // if its a directory, create it
+                        f.mkdir();
+                        continue;
+                    }
+                    java.io.InputStream is = jar.getInputStream(jarEntry); // get the input stream
+                    java.io.FileOutputStream fos = new java.io.FileOutputStream(f);
+                    while (is.available() > 0) {  // write contents of 'is' to 'fos'
+                        fos.write(is.read());
+                    }
+                    fos.close();
+                    is.close();
 
-            // Read each entry from the ZipInputStream until no more entry
-            // found indicated by a null return value of the getNextEntry()
-            // method.
-            while ((entry = zis.getNextEntry()) != null) {
-                String entryFilename = FileUtils.filename(entry.getName().replace('/', File.separatorChar));
-                String extension = FileUtils.extension(entryFilename);
-
-                if ( (StringUtils.isBlank(entryExtension) || entryExtension.equals(extension)) &&
-                        (StringUtils.isBlank(entryPattern) || entry.getName().contains(entryPattern))
-                ) {
-                    long size = entry.getCrc();
-
-                    //String targetFilename = StringUtils.isNotBlank(target)? (String.join(File.separator, target, entryFilename)) : entry.getName().replace('/', File.separatorChar);
-                    String targetFilename = targetPath==null? entry.getName().replace('/', File.separatorChar) : (String.join(File.separator, targetPath.getAbsolutePath(), entryFilename));
-
-                    Map.Entry<String,Long> checksum = Map.entry(targetFilename, size);
-                    //if (size > 0) {
-                        String entryFullName = targetPath!=null?
-                                (String.join(File.separator, getRelativeFilePath(zipFile, targetPath), entryFilename)) :
-                                (String.join(File.separator, FileUtils.dirname(zipFile.getAbsolutePath()), entryFilename));
-
-                                File entryDirFile = new File(FileUtils.dirname(entryFullName));
-                        if(!entryDirFile.exists()){
-                            FileUtils.forceMkdir(entryDirFile);
-                        }
-
-                        if(entryDirFile.exists()) {
-                            byte[] buffer = new byte[1048];
-                            try (FileOutputStream fos =
-                                         new FileOutputStream(entryFullName);
-                                 BufferedOutputStream bos =
-                                         new BufferedOutputStream(fos, buffer.length)) {
-
-                                while ((size = zis.read(buffer, 0, buffer.length)) != -1) {
-                                    bos.write(buffer, 0, (int) size);
-                                }
-                                bos.flush();
-                            }
-
-                            // success
-                            checksums.add(checksum);
-
-                        }else{
-                            throw new IOException("fail to create dictionary: " + entryDirFile);
-                        }
-                    //}
+                    entries.add(jarEntry.getName());
                 }
             }
-
-            // Print out the checksum value
-            return checksums;
+        }catch (IOException e){
         }
+        return entries;
     }
-
-
-    //https://www.cnblogs.com/softidea/p/4272451.html
-    //http://stackoverflow.com/questions/3048669/how-can-i-add-entries-to-an-existing-zip-file-in-java?lq=1
-
-    public static void addZipEntry() throws Exception {
-        Map<String, String> env = new HashMap<>();
-        env.put("create", "true");
-
-        Path path = Paths.get("test.zip");
-        URI uri = URI.create("jar:" + path.toUri());
-
-        try (java.nio.file.FileSystem fs = FileSystems.newFileSystem(uri, env)) {
-            Path nf = fs.getPath("new.txt");
-            try (Writer writer = java.nio.file.Files.newBufferedWriter(nf, StandardCharsets.UTF_8, StandardOpenOption.CREATE)) {
-                writer.write("hello");
-            }
-        }
-    }
-
-    public static String addFileToZip(File zipFile, File addFile) {
-        ZipOutputStream zos = null;
-        FileInputStream fis = null;
-        ZipEntry ze = null;
-        byte[] buffer = null;
-        int len;
-
-        try {
-            zos = new ZipOutputStream(new FileOutputStream(zipFile));
-        } catch (FileNotFoundException e) {
-        }
-
-        String entryPath = getRelativeFilePath(zipFile, addFile);
-        ze = new ZipEntry(entryPath);
-        try {
-            zos.putNextEntry(ze);
-
-            fis = new FileInputStream(addFile);
-            buffer = new byte[(int) addFile.length()];
-
-            while ((len = fis.read(buffer)) > 0) {
-                zos.write(buffer, 0, len);
-            }
-        } catch (IOException e) {
-        }
-        try {
-            zos.flush();
-            zos.close();
-            fis.close();
-        } catch (IOException e) {
-        }
-        return entryPath;
-    }
-
-    // https://stackoverflow.com/questions/2223434/appending-files-to-a-zip-file-with-java
-    public static void addFilesToZip(File source, File[] files) {
-        try {
-            File tmpZip = File.createTempFile(source.getName(), null);
-            tmpZip.delete();
-            if (!source.renameTo(tmpZip)) {
-                throw new Exception("Could not make temp file (" + source.getName() + ")");
-            }
-            byte[] buffer = new byte[1024];
-            ZipInputStream zin = new ZipInputStream(new FileInputStream(tmpZip));
-            ZipOutputStream out = new ZipOutputStream(new FileOutputStream(source));
-
-            for (int i = 0; i < files.length; i++) {
-                InputStream in = new FileInputStream(files[i]);
-                out.putNextEntry(new ZipEntry(files[i].getName()));
-                for (int read = in.read(buffer); read > -1; read = in.read(buffer)) {
-                    out.write(buffer, 0, read);
-                }
-                out.closeEntry();
-                in.close();
-            }
-
-            for (ZipEntry ze = zin.getNextEntry(); ze != null; ze = zin.getNextEntry()) {
-                out.putNextEntry(ze);
-                for (int read = zin.read(buffer); read > -1; read = zin.read(buffer)) {
-                    out.write(buffer, 0, read);
-                }
-                out.closeEntry();
-            }
-
-            out.close();
-            tmpZip.delete();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-
-    /**
-     * sample
-     * @param args
-     * @throws Exception
-     */
-    //https://docs.oracle.com/javase/7/docs/technotes/guides/io/fsp/zipfilesystemprovider.html
-    public static void addFileToZipFS(String[] args) throws Exception {
-        Map<String, String> env = new HashMap<>();
-        env.put("create", "true");
-        URI uri = URI.create("jar:file:/codeSamples/zipfs/zipfstest.zip");
-
-        try (java.nio.file.FileSystem zipfs = FileSystems.newFileSystem(uri, env)) {
-            Path externalTxtFile = Paths.get("/codeSamples/zipfs/SomeTextFile.txt");
-            Path pathInZipfile = zipfs.getPath("/SomeTextFile.txt");
-
-            // copy a file into the zip file
-            java.nio.file.Files.copy(externalTxtFile, pathInZipfile,
-                    StandardCopyOption.REPLACE_EXISTING);
-        }
-    }
-
-    static void checkManifest(String jarFileName, String mainClass) throws Exception {
-        File f = new File(jarFileName);
-        ZipFile zf = new ZipFile(f);
-        ZipEntry ze = zf.getEntry("META-INF/MANIFEST.MF");
-        BufferedReader r = new BufferedReader(
-                new InputStreamReader(zf.getInputStream(ze)));
-        String line = r.readLine();
-        while (line != null && !(line.startsWith("Main-Class:"))) {
-            line = r.readLine();
-        }
-        zf.close();
-    }
-
 
     /**
      * get single file checksum
@@ -462,5 +292,112 @@ public class ZipFileUtils {
     }
     public static String getFileChecksum(File file, String hashCode) throws IOException{
         return getFileChecksumCode(file, hashCode).toString();
+    }
+
+    /*
+       get entry content
+     */
+    public static String getJarEntryPatternContent(File jarFile, String entryNamePattern){
+        StringBuilder content = new StringBuilder();
+        try(JarFile jar = new JarFile(jarFile)) {
+            Enumeration enumEntries = jar.entries();
+            List<String> entryEffected = new ArrayList<>();
+            java.util.jar.JarEntry matchedJarEntry = null;
+            boolean ret=true;
+            while (ret && enumEntries.hasMoreElements()) {
+                java.util.jar.JarEntry jarEntry = (java.util.jar.JarEntry) enumEntries.nextElement();
+                if (jarEntry.getName().contains(entryNamePattern)) {
+                    entryEffected.add(jarEntry.getName());
+                    matchedJarEntry = jarEntry;
+                }
+                if(jarEntry.getName().equals(entryNamePattern)){
+                    ret = false;
+                }
+            }
+
+            if(entryEffected.size()==1) {
+                java.io.InputStream is = jar.getInputStream(matchedJarEntry); // get the input stream
+                BufferedReader r = new BufferedReader(
+                        new InputStreamReader(is));
+                String line = null;
+                String NewLine = "\n";
+                while ((line = r.readLine()) != null) {
+                    line = r.readLine();
+                    if(line!=null) {
+                        content.append(line);
+                        content.append(NewLine);
+                    }
+                }
+                is.close();
+            }else{
+                entryEffected.forEach(e->content.append(e + "\n"));
+            }
+        }catch (IOException e){
+        }
+        return content.toString();
+    }
+
+    public static String getZipEntryContent(File jarFile, String entryName) {
+        StringBuilder content = new StringBuilder();
+        try(ZipFile jar = new JarFile(jarFile)) {
+            ZipEntry zipEntry = jar.getEntry(entryName);
+            BufferedReader r = new BufferedReader(
+                    new InputStreamReader(jar.getInputStream(zipEntry)));
+            String line = r.readLine();
+            String NewLine = "\n";
+            while (line != null) {
+                line = r.readLine();
+                if(line!=null) {
+                    content.append(line);
+                    content.append(NewLine);
+                }
+            }
+        }catch (Exception e){
+        }
+        return content.toString();
+    }
+
+    public static String getJarManifestContent(File jarFile) {
+        return getZipEntryContent(jarFile, "META-INF/MANIFEST.MF");
+    }
+
+    public static String getJarPomContent(File jarFile) {
+        final String NewLine = "\n";
+        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml");
+        String jarName = FileUtils.filename(jarFile.getName()).replace("."+FileUtils.extension(jarFile.getName()), "");
+
+        if(StringUtils.isNotBlank(entriesContent)) {
+            String[] entries = entriesContent.split(NewLine);
+
+            var list = Stream.of(entries)
+                    .filter(u->u.trim().endsWith(String.join("/", jarName, "pom.xml")))
+                    .collect(Collectors.toList());
+            if(list.size()>0) {
+                return getZipEntryContent(jarFile, list.get(0));
+            }
+        }
+        return entriesContent;
+    }
+
+    public static String getJarGroupId(File jarFile) {
+        final String NewLine = "\n";
+        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml");
+        String jarName = FileUtils.filename(jarFile.getName()).replace("."+FileUtils.extension(jarFile.getName()), "");
+
+        if(StringUtils.isNotBlank(entriesContent)) {
+            String[] entries = entriesContent.split(NewLine);
+
+            var list = Stream.of(entries)
+                    .filter(u->u.trim().endsWith(String.join("/", jarName, "pom.xml")))
+                    .collect(Collectors.toList());
+            if(list.size()>0) {
+                String pomEntry = list.get(0);
+                String dirname = FileUtils.dirname(FileUtils.dirname(pomEntry));
+                // get groupId from it
+                String last = FileUtils.filename(dirname);
+                return last;
+            }
+        }
+        return "";
     }
 }

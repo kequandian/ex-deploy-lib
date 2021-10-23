@@ -19,8 +19,6 @@ import io.swagger.annotations.ApiParam;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.benf.cfr.reader.api.CfrDriver;
-import org.benf.cfr.reader.api.OutputSinkFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,12 +27,10 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import java.io.*;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
-import java.util.zip.ZipFile;
 
 /**
  * 依赖处理接口
@@ -358,8 +354,8 @@ public class JarDeployEndpoint {
                 return SuccessTip.create(ZipFileUtils.listEntriesFromArchive(jarFile, "", pattern));
             }
 
-            File targetPath = new File(String.join(File.separator, rootPath, target));
-            var unzipFiles = ZipFileUtils.unzipFilesFromArchiva(jarFile, "", pattern, targetPath);
+            String targetPath = String.join(File.separator, rootPath, target);
+            var unzipFiles = ZipFileUtils.extraJarEntries(jarFile, "", pattern, targetPath);
             files = unzipFiles.stream()
                     .filter(f -> FilenameUtils.getExtension(f).equals("class"))
                     .map(
