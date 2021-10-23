@@ -5,12 +5,14 @@ import com.alibaba.fastjson.serializer.SerializerFeature;
 import com.jfeat.jar.dependency.DependencyUtils;
 import com.jfeat.jar.dependency.ZipFileUtils;
 import org.apache.commons.cli.*;
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.plexus.util.FileUtils;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * @author zxchengb
@@ -41,18 +43,23 @@ public class MainMethod {
      */
     private static final String COMPARE_OPTION = "c";
 
-    /**s
+    /**
      * 输出相同项，默认输出不同项
      */
     private static final String MATCH_OPTION = "m";
-    /**s
+    /**
      * 输出不相同项 （左不同项)
      */
     private static final String LEFT_DIFF_OPTION = "l";
-    /**s
+    /**
      * 输出不相同项 （右不同项)
      */
     private static final String RIGHT_DIFF_OPTION = "r";
+
+    /**
+     * 详细比较
+     */
+    private static final String VERBOSE_OPTION = "v";
 
 
     public static void main(String[] args) {
@@ -78,6 +85,11 @@ public class MainMethod {
         Option matchOpt = new Option(MATCH_OPTION, "match", false, "compare matches");
         matchOpt.setRequired(false);
         options.addOption(matchOpt);
+
+        // verbose compare
+        Option verboseOpt = new Option(VERBOSE_OPTION, "verbose", false, "compare mismatch with verbose");
+        verboseOpt.setRequired(false);
+        options.addOption(verboseOpt);
 
         CommandLineParser parser = new DefaultParser();
         HelpFormatter formatter = new HelpFormatter();
@@ -142,18 +154,56 @@ public class MainMethod {
 
                 if(cmd.hasOption(MATCH_OPTION)) {
                     result.addAll(DependencyUtils.getSameDependencies(d1, d2));
+
                 }else if(cmd.hasOption(RIGHT_DIFF_OPTION)){
                     // mismatch from right
-                    result.addAll(DependencyUtils.getDifferentDependencies(d2, d1));
+                    if(cmd.hasOption(VERBOSE_OPTION)) {
+                        result.addAll(getDependenciesMismatchVerbose(d2, d1, FileUtils.filename(jar2.getName()), FileUtils.filename(jar1.getName())));
+                    }else{
+                        result.addAll(DependencyUtils.getDifferentDependencies(d2, d1));
+                    }
+
                 }else{
-                    // default mismatch
-                    result.addAll(DependencyUtils.getDifferentDependencies(d1, d2));
+                    // mismatch from left as default
+                    if(cmd.hasOption(VERBOSE_OPTION)){
+                        result.addAll(getDependenciesMismatchVerbose(d1, d2, FileUtils.filename(jar1.getName()), FileUtils.filename(jar2.getName())));
+                    }else {
+                        result.addAll(DependencyUtils.getDifferentDependencies(d1, d2));
+                    }
+
                 }
             }
             printOut(result, cmd.hasOption(JSON_OPTION));
         }
     }
 
+
+    /*
+      不同依赖项的详细对比
+     */
+    private static List<String> getDependenciesMismatchVerbose(List<String> d1, List<String> d2, String jar1, String jar2) {
+        List<String> diff = DependencyUtils.getDifferentDependencies(d1, d2);
+
+        var verbose = diff.stream()
+                .map(u->{
+                    String entryWithoutChecksum = u.contains("@") ? u.substring(0,u.indexOf("@")):u;
+                    String entryWithoutVersion  = entryWithoutChecksum.replaceAll("\\-[0-9\\.]+\\-?[a-zA-Z]*.jar", "");
+
+                    // get the diff d1
+                    String diffOne = d1.stream().filter(e->e.startsWith(entryWithoutVersion)).collect(Collectors.joining());
+                    if(StringUtils.isNotBlank(diffOne)){
+                        return String.join("", jar1, "!", diffOne, "\t", u);
+                    }
+                    return String.join("", jar1, "\t\t", u);
+                })
+                .collect(Collectors.toList());
+
+        return verbose;
+    }
+
+    /*
+     获取文件的依赖以及 checksum
+     */
     private static List<String> getChecksumDependencies(File jarFile) {
         List<String> d1 = new ArrayList<>();
         try {
@@ -166,6 +216,10 @@ public class MainMethod {
         return d1;
     }
 
+
+    /*
+     打印依赖项
+     */
     private static void printOut(List<String> result, boolean jsonFormat){
         if (jsonFormat) {
             System.out.println(
@@ -177,7 +231,9 @@ public class MainMethod {
             );
         }
     }
-
+    /*
+      由单个文件名转换为 BOOT-INF/lib/<>
+     */
     private static String jarToEntry(String jarPath){
         if(FileUtils.extension(jarPath).equals("jar")){
             return String.join("", "BOOT-INF/lib/", FileUtils.filename(jarPath));
@@ -186,6 +242,9 @@ public class MainMethod {
         }
         return FileUtils.basename(jarPath);
     }
+    /*
+      由单个文件名转换为 BOOT-INF/lib/<>, 并获取文件checksum
+     */
     private static String jarToEntryWithChecksum(String jarPath){
         String entry = jarToEntry(jarPath);
         try {
