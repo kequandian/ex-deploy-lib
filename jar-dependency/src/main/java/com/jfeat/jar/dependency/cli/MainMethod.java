@@ -24,8 +24,20 @@ public class MainMethod {
     /**
      * Dependency list
      */
+    private static final String PARSE_OPTION = "p";
+
+    /*
+    List all entries from archiva
+     */
     private static final String LIST_OPTION = "t";
+    /*
+    inspect the entry content from archiva, if the entry is jar, list all its entries
+     */
     private static final String INSPECT_OPTION = "i";
+
+    /*
+    get the groupId of an jar lib
+     */
     private static final String GROUPID_OPTION = "g";
     /**
      * 输出为JSON
@@ -60,10 +72,14 @@ public class MainMethod {
     public static void main(String[] args) {
         Options options = new Options();
 
-        Option dependencyOpt = new Option(LIST_OPTION, "list", false, "list and print the dependencies");
+        Option dependencyOpt = new Option(PARSE_OPTION, "parse", false, "parse the archiva dependencies");
         dependencyOpt.setRequired(false);
         options.addOption(dependencyOpt);
-        Option inspectOpt = new Option(INSPECT_OPTION, "inspect", false, "inspect the entry file content");
+
+        Option listOpt = new Option(LIST_OPTION, "list", false, "list all the entries from archiva");
+        listOpt.setRequired(false);
+        options.addOption(listOpt);
+        Option inspectOpt = new Option(INSPECT_OPTION, "inspect", true, "inspect the entry file content");
         inspectOpt.setRequired(false);
         options.addOption(inspectOpt);
         Option groupIdOpt = new Option(GROUPID_OPTION, "groupid", false, "get the jar deployment groupId");
@@ -102,7 +118,7 @@ public class MainMethod {
                 throw new ParseException("no arg!");
             }
 
-            if (cmd.hasOption(LIST_OPTION)) {
+            if (cmd.hasOption(LIST_OPTION) || cmd.hasOption(INSPECT_OPTION) || cmd.hasOption(GROUPID_OPTION)) {
                 if (cmd.getArgList().size() < 1) {
                     throw new ParseException("require 1 jars to get dependency !");
                 }
@@ -138,18 +154,42 @@ public class MainMethod {
         }
 
         // 获取依赖
-        if (cmd.hasOption(LIST_OPTION)) {
+        if (cmd.hasOption(PARSE_OPTION)) {
             List<String> d1 = cmd.hasOption(CHECKSUM_OPTION) ? getChecksumDependencies(jar1)
                     : DependencyUtils.getDependenciesByJar(jar1);
             printOut(d1, cmd.hasOption(JSON_OPTION));
 
-        }else if(cmd.hasOption(INSPECT_OPTION)){
+        }else if (cmd.hasOption(LIST_OPTION)) {
+            try {
+                List<String> d1 = ZipFileUtils.listEntriesFromArchive(jar1, "", "");
+                printOut(d1, cmd.hasOption(JSON_OPTION));
+            }catch (IOException e){
+            }
+        }
+        else if(cmd.hasOption(INSPECT_OPTION)){
             String entryPattern  = cmd.getOptionValue(INSPECT_OPTION);
             final String NewLine = "\n";
-            var entriesContent = ZipFileUtils.getJarEntryPatternContent(jar1, entryPattern);
-            if(StringUtils.isNotBlank(entriesContent)) {
-                var entries = Stream.of(entriesContent.split(NewLine)).collect(Collectors.toList());
-                printOut(entries, cmd.hasOption(JSON_OPTION));
+            var entriesContent = ZipFileUtils.getJarEntryPatternContent(jar1, entryPattern, true);
+            if(entriesContent.contains(NewLine)){
+                // means multi matches, just output all entries
+                if(StringUtils.isNotBlank(entriesContent)) {
+                    var entries = Stream.of(entriesContent.split(NewLine)).collect(Collectors.toList());
+                    printOut(entries, cmd.hasOption(JSON_OPTION));
+                }
+            }else{
+                if(FileUtils.extension(entriesContent).equals("jar")){
+                    // bin, print out the entries
+                    var entries = ZipFileUtils.getJarEntriesWithinEntry(jar1, entriesContent);
+                    printOut(entries, cmd.hasOption(JSON_OPTION));
+
+                }else{
+                    // print out the entry content
+                    entriesContent = ZipFileUtils.getJarEntryPatternContent(jar1, entryPattern, false);
+                    if(StringUtils.isNotBlank(entriesContent)) {
+                        var entries = Stream.of(entriesContent.split(NewLine)).collect(Collectors.toList());
+                        printOut(entries, cmd.hasOption(JSON_OPTION));
+                    }
+                }
             }
 
         }else if(cmd.hasOption(GROUPID_OPTION)){

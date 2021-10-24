@@ -13,6 +13,8 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.jar.JarFile;
+import java.util.jar.JarInputStream;
+import java.util.jar.Manifest;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.zip.*;
@@ -137,7 +139,7 @@ public class ZipFileUtils {
             System.out.println(checksum.padToLong());
 
         }else if(cmd.hasOption(INSPECT_ENTRY_OPT)){
-            System.out.println(getJarEntryPatternContent(jarFile, cmd.getOptionValue(INSPECT_ENTRY_OPT)));
+            System.out.println(getJarEntryPatternContent(jarFile, cmd.getOptionValue(INSPECT_ENTRY_OPT), false));
         }else if(cmd.hasOption(INSPECT_MANIFEST_OPT)){
             System.out.println(getJarManifestContent(jarFile));
         }else if(cmd.hasOption(INSPECT_POM_OPT)){
@@ -297,7 +299,7 @@ public class ZipFileUtils {
     /*
        get entry content
      */
-    public static String getJarEntryPatternContent(File jarFile, String entryNamePattern){
+    public static String getJarEntryPatternContent(File jarFile, String entryNamePattern, boolean forcePath){
         StringBuilder content = new StringBuilder();
         try(JarFile jar = new JarFile(jarFile)) {
             Enumeration enumEntries = jar.entries();
@@ -316,33 +318,41 @@ public class ZipFileUtils {
             }
 
             if(entryEffected.size()==1) {
-                java.io.InputStream is = jar.getInputStream(matchedJarEntry); // get the input stream
-                BufferedReader r = new BufferedReader(
-                        new InputStreamReader(is));
-                String line = null;
-                String NewLine = "\n";
-                while ((line = r.readLine()) != null) {
-                    line = r.readLine();
-                    if(line!=null) {
-                        content.append(line);
-                        content.append(NewLine);
+                if(forcePath){
+                    // force to path
+                    content.append(entryEffected.get(0));
+                }else {
+                    java.io.InputStream is = jar.getInputStream(matchedJarEntry); // get the input stream
+                    BufferedReader r = new BufferedReader(
+                            new InputStreamReader(is));
+                    String line = null;
+                    String NewLine = "\n";
+                    while ((line = r.readLine()) != null) {
+                        line = r.readLine();
+                        if (line != null) {
+                            content.append(line);
+                            content.append(NewLine);
+                        }
                     }
+                    is.close();
                 }
-                is.close();
             }else{
                 entryEffected.forEach(e->content.append(e + "\n"));
             }
         }catch (IOException e){
+            System.out.println(e.getMessage());
         }
         return content.toString();
     }
 
-    public static String getZipEntryContent(File jarFile, String entryName) {
+    public static String getZipEntryContent(File file, String entryName) {
         StringBuilder content = new StringBuilder();
-        try(ZipFile jar = new JarFile(jarFile)) {
-            ZipEntry zipEntry = jar.getEntry(entryName);
+        try(JarFile jarFile = new JarFile(file)) {
+            Manifest manifest = jarFile.getManifest();
+
+            ZipEntry zipEntry = jarFile.getEntry(entryName);
             BufferedReader r = new BufferedReader(
-                    new InputStreamReader(jar.getInputStream(zipEntry)));
+                    new InputStreamReader(jarFile.getInputStream(zipEntry)));
             String line = r.readLine();
             String NewLine = "\n";
             while (line != null) {
@@ -361,13 +371,32 @@ public class ZipFileUtils {
         return getZipEntryContent(jarFile, "META-INF/MANIFEST.MF");
     }
 
+    public static List<String> getJarEntriesWithinEntry(File file, String entryName){
+        List<String> entries = new ArrayList<>();
+
+        try(JarFile jarFile = new JarFile(file)) {
+            ZipEntry zipEntry = jarFile.getEntry(entryName);
+            try(InputStream is = jarFile.getInputStream(zipEntry)) {
+                JarInputStream jarInputStream = new JarInputStream(is);
+                ZipEntry entry = null;
+                while ((entry = jarInputStream.getNextEntry()) != null) {
+                    entries.add(entry.getName());
+                }
+            }catch (IOException e){
+            }
+        }catch(IOException e){
+        }
+
+        return entries;
+    }
+
     public static String getJarPomContent(File jarFile) {
         final String NewLine = "\n";
-        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml");
+        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml", true);
         String jarName = FileUtils.filename(jarFile.getName()).replace("."+FileUtils.extension(jarFile.getName()), "");
 
         if(StringUtils.isNotBlank(entriesContent)) {
-            String[] entries = entriesContent.split(NewLine);
+            String[] entries = entriesContent.contains(NewLine)? entriesContent.split(NewLine) : new String[]{entriesContent};
 
             var list = Stream.of(entries)
                     .filter(u->u.trim().endsWith(String.join("/", jarName, "pom.xml")))
@@ -381,22 +410,31 @@ public class ZipFileUtils {
 
     public static String getJarGroupId(File jarFile) {
         final String NewLine = "\n";
-        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml");
-        String jarName = FileUtils.filename(jarFile.getName()).replace("."+FileUtils.extension(jarFile.getName()), "");
+        String entriesContent = getJarEntryPatternContent(jarFile, "pom.xml", true);
+
 
         if(StringUtils.isNotBlank(entriesContent)) {
-            String[] entries = entriesContent.split(NewLine);
+            String[] entries = entriesContent.contains(NewLine) ? entriesContent.split(NewLine) : new String[]{entriesContent};
 
-            var list = Stream.of(entries)
-                    .filter(u->u.trim().endsWith(String.join("/", jarName, "pom.xml")))
-                    .collect(Collectors.toList());
-            if(list.size()>0) {
-                String pomEntry = list.get(0);
-                String dirname = FileUtils.dirname(FileUtils.dirname(pomEntry));
-                // get groupId from it
-                String last = FileUtils.filename(dirname);
-                return last;
+            String pomEntry = null;
+            if(entries.length>1) {
+                final String jarName = FileUtils.filename(jarFile.getName())
+                        .replaceAll("-[0-9\\.]+\\-?[a-zA-Z]*.jar", "");
+                //remove -version-RELEASE.jar
+
+                var list = Stream.of(entries)
+                        .filter(u -> u.trim().endsWith(String.join("/", jarName, "pom.xml")))
+                        .collect(Collectors.toList());
+                if (list.size() ==1) {
+                    pomEntry = list.get(0);
+                }
+            }else if(entries.length==1){
+                pomEntry = entries[0];
             }
+
+            String dirname = FileUtils.dirname(FileUtils.dirname(pomEntry));
+            // get groupId from it
+            return FileUtils.filename(dirname);
         }
         return "";
     }
