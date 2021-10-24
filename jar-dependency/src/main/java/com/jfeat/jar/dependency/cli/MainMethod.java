@@ -118,14 +118,15 @@ public class MainMethod {
                 throw new ParseException("no arg!");
             }
 
-            if (cmd.hasOption(LIST_OPTION) || cmd.hasOption(INSPECT_OPTION) || cmd.hasOption(GROUPID_OPTION)) {
+            String jar1arg = cmd.getArgs()[0];
+            jar1 = new File(jar1arg);
+            if(!jar1.exists()){
+                throw new ParseException(" not exits !");
+            }
+
+            if (cmd.hasOption(PARSE_OPTION) || cmd.hasOption(LIST_OPTION) || cmd.hasOption(INSPECT_OPTION) || cmd.hasOption(GROUPID_OPTION)) {
                 if (cmd.getArgList().size() < 1) {
                     throw new ParseException("require 1 jars to get dependency !");
-                }
-                String jar1arg = cmd.getArgs()[0];
-                jar1 = new File(jar1arg);
-                if(!jar1.exists()){
-                    throw new ParseException(" not exits !");
                 }
             }
 
@@ -133,14 +134,8 @@ public class MainMethod {
                 if (cmd.getArgList().size() < 2) {
                     throw new ParseException("require 2 jars to compare !");
                 }
-                String jar1arg = cmd.getArgs()[0];
                 String jar2arg = cmd.getArgs()[1];
-
-                jar1 = new File(jar1arg);
                 jar2 = new File(jar2arg);
-                if(!jar1.exists()){
-                    throw new ParseException(jar1arg + " not exits !");
-                }
                 if(!jar2.exists()){
                     throw new ParseException(jar2arg + " not exits !");
                 }

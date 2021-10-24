@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
+import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.jar.JarInputStream;
 import java.util.jar.Manifest;
@@ -216,6 +217,46 @@ public class ZipFileUtils {
             // Print out the checksum value
             return checksums;
         }
+    }
+
+    /**
+     * extra jar entry within jar
+     */
+    public static List<Map.Entry<String,Long>> extraJarEntriesWithChecksum(File file, String extension, String pattern, String destDir) {
+        List<Map.Entry<String,Long>> entries = new ArrayList<>();
+
+        try(JarFile jarFile = new JarFile(file);
+            CheckedInputStream cs =
+                    new CheckedInputStream(new FileInputStream(file), new Adler32());
+            JarInputStream jarInputStream =
+                    new JarInputStream(new BufferedInputStream(cs));
+            ) {
+
+//            Enumeration enumEntries = jarInputStream.entries();
+            JarEntry jarEntry = null;
+            while ((jarEntry = jarInputStream.getNextJarEntry())!=null) {
+                if((StringUtils.isBlank(extension) || FileUtils.extension(jarEntry.getName()).equals(extension)) &&
+                        StringUtils.isBlank(pattern) || jarEntry.getName().contains(pattern)) {
+
+                    File f = new File(String.join(File.separator, destDir, jarEntry.getName()));
+                    if (jarEntry.isDirectory()) { // if its a directory, create it
+                        f.mkdir();
+                        continue;
+                    }
+                    InputStream is = jarFile.getInputStream(jarEntry); // get the input stream
+                    FileOutputStream fos = new FileOutputStream(f);
+                    while (is.available() > 0) {  // write contents of 'is' to 'fos'
+                        fos.write(is.read());
+                    }
+                    fos.close();
+                    is.close();
+
+                    entries.add(Map.entry(jarEntry.getName(), jarEntry.getCrc()));
+                }
+            }
+        }catch (IOException e){
+        }
+        return entries;
     }
 
     /**

@@ -149,7 +149,7 @@ public class DepUtils {
             org.codehaus.plexus.util.FileUtils.mkdir(targetPath.getAbsolutePath());
         }
 
-        var checkums = ZipFileUtils.UnzipWithChecksum(jarFile, entryExtension, entryPattern, targetPath);
+        var checkums = ZipFileUtils.extraJarEntriesWithChecksum(jarFile, entryExtension, entryPattern, targetPath.getAbsolutePath());
         String commonBasedir = com.jfeat.jar.dependency.FileUtils.getCommonBasedir(jarFile.getAbsolutePath(), targetPath.getAbsolutePath());
 
         // remove rootPath from checksum

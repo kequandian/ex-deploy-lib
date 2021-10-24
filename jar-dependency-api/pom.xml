@@ -15,7 +15,7 @@
     </parent>
 
     <properties>
-        <skipStandalone>true</skipStandalone>
+        <skipStandalone>false</skipStandalone>
         <!---only produce, scope provided-->
         <projectlombok.version>1.18.8</projectlombok.version>
         <jdk-comelier.version>11</jdk-comelier.version>
