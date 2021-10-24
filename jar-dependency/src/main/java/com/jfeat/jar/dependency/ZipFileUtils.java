@@ -267,7 +267,7 @@ public class ZipFileUtils {
         try(JarFile jar = new JarFile(jarFile)) {
             Enumeration enumEntries = jar.entries();
             while (enumEntries.hasMoreElements()) {
-                java.util.jar.JarEntry jarEntry = (java.util.jar.JarEntry) enumEntries.nextElement();
+                JarEntry jarEntry = (JarEntry) enumEntries.nextElement();
                 if((StringUtils.isBlank(extension) || FileUtils.extension(jarEntry.getName()).equals(extension)) &&
                         StringUtils.isBlank(pattern) || jarEntry.getName().contains(pattern)) {
 
@@ -345,10 +345,10 @@ public class ZipFileUtils {
         try(JarFile jar = new JarFile(jarFile)) {
             Enumeration enumEntries = jar.entries();
             List<String> entryEffected = new ArrayList<>();
-            java.util.jar.JarEntry matchedJarEntry = null;
+            JarEntry matchedJarEntry = null;
             boolean ret=true;
             while (ret && enumEntries.hasMoreElements()) {
-                java.util.jar.JarEntry jarEntry = (java.util.jar.JarEntry) enumEntries.nextElement();
+                JarEntry jarEntry = (JarEntry) enumEntries.nextElement();
                 if (jarEntry.getName().contains(entryNamePattern)) {
                     entryEffected.add(jarEntry.getName());
                     matchedJarEntry = jarEntry;
@@ -412,6 +412,9 @@ public class ZipFileUtils {
         return getZipEntryContent(jarFile, "META-INF/MANIFEST.MF");
     }
 
+    /*
+    列出archiva中的jar类型entry中的文件
+     */
     public static List<String> getJarEntriesWithinEntry(File file, String entryName){
         List<String> entries = new ArrayList<>();
 
@@ -429,6 +432,95 @@ public class ZipFileUtils {
         }
 
         return entries;
+    }
+
+    public static List<String> getJarArchiveTree(File file, boolean checksum){
+        List<String> tree = new ArrayList<>();
+
+        try(JarFile jarFile = new JarFile(file);
+            CheckedInputStream cs =
+                    new CheckedInputStream(new FileInputStream(file), new Adler32());
+            JarInputStream jarInputStream =
+                    new JarInputStream(new BufferedInputStream(cs));
+        ) {
+            JarEntry jarEntry = null;
+            while((jarEntry = jarInputStream.getNextJarEntry()) != null) {
+                if(!jarEntry.isDirectory()) {
+
+                    tree.add((checksum && jarEntry.getCrc() > 0) ?
+                            String.join("@", jarEntry.getName(), String.valueOf(jarEntry.getCrc()))
+                            : jarEntry.getName());
+
+                    if (FileUtils.extension(jarEntry.getName()).equals("jar") ||
+                            FileUtils.extension(jarEntry.getName()).equals("zip")) {
+                        try (InputStream is = jarFile.getInputStream(jarEntry)) {
+                            JarInputStream jis = new JarInputStream(is);
+                            ZipEntry entry = null;
+                            while ((entry = jis.getNextEntry()) != null) {
+                                if(!entry.isDirectory()) {
+                                    tree.add((checksum && entry.getCrc() > 0) ?
+                                            String.join("@", ("+- " + entry.getName()), String.valueOf(entry.getCrc()))
+                                            : entry.getName());
+                                }
+                            }
+                        } catch (IOException e) {
+                        }
+                    }
+
+                } // not dir
+            }
+        }catch(IOException e){
+        }
+        return tree;
+    }
+
+    /*
+    在archive中搜索隐含在jar entry中文件
+     */
+    public static List<String> searchWithinJarArchive(File file, String criteria, boolean checksum){
+        List<String> criterias = new ArrayList<>();
+
+        try(JarFile jarFile = new JarFile(file);
+            CheckedInputStream cs =
+                    new CheckedInputStream(new FileInputStream(file), new Adler32());
+            JarInputStream jarInputStream =
+                    new JarInputStream(new BufferedInputStream(cs));
+        ) {
+            JarEntry jarEntry = null;
+            while((jarEntry = jarInputStream.getNextJarEntry()) != null) {
+                if(!jarEntry.isDirectory()) {
+
+                    if(jarEntry.getName().contains(criteria)) {
+                        criterias.add((checksum && jarEntry.getCrc() > 0) ?
+                                String.join("@", jarEntry.getName(), String.valueOf(jarEntry.getCrc()))
+                                : jarEntry.getName());
+                    }
+
+                    if (FileUtils.extension(jarEntry.getName()).equals("jar") ||
+                            FileUtils.extension(jarEntry.getName()).equals("zip")) {
+
+                        try (InputStream is = jarFile.getInputStream(jarEntry)) {
+                            JarInputStream jis = new JarInputStream(is);
+                            ZipEntry entry = null;
+                            while ((entry = jis.getNextEntry()) != null) {
+                                if(!entry.isDirectory()) {
+                                    if(entry.getName().contains(criteria)){
+                                        criterias.add((checksum && entry.getCrc() > 0) ?
+                                                String.join("\n", jarEntry.getName(), "+- "+String.join("@",entry.getName(), String.valueOf(entry.getCrc())))
+                                                : String.join("\n", jarEntry.getName(), "+- "+entry.getName()));
+                                    }
+                                }
+                            }
+                        } catch (IOException e) {
+                        }
+                    }
+
+                } // not dir
+            }
+        }catch(IOException e){
+        }
+
+        return criterias;
     }
 
     public static String getJarPomContent(File jarFile) {

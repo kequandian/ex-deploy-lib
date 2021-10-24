@@ -27,9 +27,18 @@ public class MainMethod {
     private static final String PARSE_OPTION = "p";
 
     /*
-    List all entries from archiva
+    List all entries from archive
      */
-    private static final String LIST_OPTION = "t";
+    private static final String LIST_OPTION = "l";
+    /*
+    Show all entries from archive as tree
+     */
+    private static final String TREE_OPTION = "t";
+    /*
+    search entry from archive and show the entry path
+     */
+    private static final String SEARCH_OPTION = "s";
+
     /*
     inspect the entry content from archiva, if the entry is jar, list all its entries
      */
@@ -46,7 +55,7 @@ public class MainMethod {
     /**
      * 同时进行 checksum 比较
      */
-    private static final String CHECKSUM_OPTION = "s";
+    private static final String CHECKSUM_OPTION = "u";
 
 
     /**
@@ -72,13 +81,21 @@ public class MainMethod {
     public static void main(String[] args) {
         Options options = new Options();
 
-        Option dependencyOpt = new Option(PARSE_OPTION, "parse", false, "parse the archiva dependencies");
+        Option dependencyOpt = new Option(PARSE_OPTION, "parse", false, "parse the archive dependencies");
         dependencyOpt.setRequired(false);
         options.addOption(dependencyOpt);
 
-        Option listOpt = new Option(LIST_OPTION, "list", false, "list all the entries from archiva");
+        Option listOpt = new Option(LIST_OPTION, "list", false, "list all the entries from archive");
         listOpt.setRequired(false);
         options.addOption(listOpt);
+        Option treeOpt = new Option(TREE_OPTION, "tree", false, "show all the entries from archive as tree");
+        treeOpt.setRequired(false);
+        options.addOption(treeOpt);
+        options.addOption(listOpt);
+        Option searchOpt = new Option(SEARCH_OPTION, "search", true, "search criteria within archive");
+        searchOpt.setRequired(false);
+        options.addOption(searchOpt);
+
         Option inspectOpt = new Option(INSPECT_OPTION, "inspect", true, "inspect the entry file content");
         inspectOpt.setRequired(false);
         options.addOption(inspectOpt);
@@ -93,9 +110,9 @@ public class MainMethod {
         jsonOpt.setRequired(false);
         options.addOption(jsonOpt);
 
-        Option fatjarOpt = new Option(COMPARE_OPTION, "compare", false, "compare two jars, mismatch from left");
-        fatjarOpt.setRequired(false);
-        options.addOption(fatjarOpt);
+        Option compareOpt = new Option(COMPARE_OPTION, "compare", false, "compare two archive, mismatch from left");
+        compareOpt.setRequired(false);
+        options.addOption(compareOpt);
         Option rightMisOpt = new Option(RIGHT_DIFF_OPTION, "right", false, "mismatch from right");
         rightMisOpt.setRequired(false);
         options.addOption(rightMisOpt);
@@ -117,17 +134,10 @@ public class MainMethod {
             if (cmd.getArgList().size() == 0) {
                 throw new ParseException("no arg!");
             }
-
             String jar1arg = cmd.getArgs()[0];
             jar1 = new File(jar1arg);
             if(!jar1.exists()){
                 throw new ParseException(" not exits !");
-            }
-
-            if (cmd.hasOption(PARSE_OPTION) || cmd.hasOption(LIST_OPTION) || cmd.hasOption(INSPECT_OPTION) || cmd.hasOption(GROUPID_OPTION)) {
-                if (cmd.getArgList().size() < 1) {
-                    throw new ParseException("require 1 jars to get dependency !");
-                }
             }
 
             if (cmd.hasOption(COMPARE_OPTION)) {
@@ -160,6 +170,12 @@ public class MainMethod {
                 printOut(d1, cmd.hasOption(JSON_OPTION));
             }catch (IOException e){
             }
+        }else if(cmd.hasOption(TREE_OPTION)){
+            List<String> d1 = ZipFileUtils.getJarArchiveTree(jar1, cmd.hasOption(CHECKSUM_OPTION));
+            printOut(d1, cmd.hasOption(JSON_OPTION));
+        }else if(cmd.hasOption(SEARCH_OPTION)){
+            List<String> d1 = ZipFileUtils.searchWithinJarArchive(jar1, cmd.getOptionValue(SEARCH_OPTION), cmd.hasOption(CHECKSUM_OPTION));
+            printOut(d1, cmd.hasOption(JSON_OPTION));
         }
         else if(cmd.hasOption(INSPECT_OPTION)){
             String entryPattern  = cmd.getOptionValue(INSPECT_OPTION);
