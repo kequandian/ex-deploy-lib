@@ -11,7 +11,9 @@ import org.codehaus.plexus.util.FileUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -175,7 +177,47 @@ public class MainMethod {
             printOut(d1, cmd.hasOption(JSON_OPTION));
         }else if(cmd.hasOption(SEARCH_OPTION)){
             List<String> d1 = ZipFileUtils.searchWithinJarArchive(jar1, cmd.getOptionValue(SEARCH_OPTION), cmd.hasOption(CHECKSUM_OPTION));
-            printOut(d1, cmd.hasOption(JSON_OPTION));
+
+
+            // start group
+                String currentKey = null;
+                Map<String,List<String>> map=new HashMap();
+                for(int i=0;i<d1.size();i++){
+                    String key=d1.get(i);
+                    // 判断是否以+- 开头
+                    boolean isValue = key.startsWith("+- ");
+                    if(!isValue){
+                        // 保存key值
+                        currentKey = key;
+                        // key
+                        if(map.containsKey(key)){
+                        }else{
+                            map.put(key, null);
+                        }
+                    }else{
+                        List<String> list = map.get(currentKey);
+                        if(list==null){
+                            list = new ArrayList<>();
+                            map.put(currentKey, list);
+                        }
+                        list.add(key);
+                    }
+                }
+
+                List<String> d2 = new ArrayList<>();
+                for (String key: map.keySet()) {
+                    d2.add(key);
+                    List<String> list = map.get(key);
+                    if(list!=null) {
+                        for (int i = 0; i < list.size(); i++) {
+                            d2.add(list.get(i));
+                        }
+                    }
+                }
+            /// end group
+
+
+            printOut(d2, cmd.hasOption(JSON_OPTION));
         }
         else if(cmd.hasOption(INSPECT_OPTION)){
             String entryPattern  = cmd.getOptionValue(INSPECT_OPTION);
